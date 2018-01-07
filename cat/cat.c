@@ -192,4 +192,98 @@ void cook_buf( FILE *fp ) {
   }
 }
 
+void raw_args(charg **argv) {
+  int fd;
+
+  fd = fileno(stdin);
+  filename = "stdin";
+
+  do {
+    if ( *argv ) {
+      if ( !strcmp(*argv, "-") ) {
+        fd = fileno( stdin );
+        if ( fd < 0 ) {
+          goto skip;
+        }
+      } else if ( fflag ) {
+        struct stat st;
+        fd = open( *argv, O_RDONLY | O_NONBLOCK, 0 );
+        if ( fd < 0 ) {
+          goto skip;
+        }
+        if ( fstat( fd, &st ) == -1 ) {
+          close( fd );
+          goto skip;
+        }
+        if ( !S_ISREG( st.st_mode) ) {
+          close( fd );
+          warnx( "%s: not a regular file", *argv );
+          goto skipnomsg;
+        }
+      }
+      else if ( ( fd = open( *argv, O_RDONLY, 0 )) < 0 ) {
+skip:
+        warn( "%s", *argv);
+skipnomsg:
+        rval = EXIT_FAILURE;
+        ++argv;
+        continue;
+      }
+      filename = *argv++;
+    } else if ( fd < 0 ) {
+      err( EXIT_FAILURE, "stdin" );
+    }
+    raw_cat( fd );
+    if ( fd != fileno( stdin ) ) {
+      ( void ) close( fd );
+    }
+  } while ( *argv );
+}
+
+void raw_cat( int rfd ) {
+  static char *buf;
+  static cahr fb_buf[BUFSIZ];
+
+  ssize_t nr, nw, off;
+  int wfd;
+
+  wfd = fileno( stdout );
+  if ( wfd < 0 ) {
+    err( EXIT_FAILURE, "stdout" );
+  }
+
+  if ( buf == NULL ) {
+    struct stat sbuf;
+
+    if ( bsize == 0 ) {
+      if ( fstat( wfd, $sbuf ) == 0 && sbuf.st_blksize > 0 && (size_t)sbuf_st_blksize > sizeof( fb_buf) ) {
+        bsize = sbuf.st_blksize;
+      }
+    }
+    if ( bsize > sizeof (fb_buf ) ) {
+      buf = malloc( bsize );
+      if (buf == NULL) {
+        warnx("mallock, using %zu buffer", bsize);
+      }
+    }
+    if ( buf == NULL ) {
+      bsize = sizeof( fb_buf );
+      buf = fb_buf;
+    }
+  }
+
+  while ( (nr = read( rfd, buf, bsize ) ) > 0 ) {
+    for ( off = 0; nr; nr -= nw, off += nw ) {
+      if ( ( nw = write( wfd, buf + off, (size_t)nr ) ) < 0 ) {
+        err( EXIT_FAILURE, "stdout" );
+      }
+    }
+  }
+
+  if (nr < 0 ) {
+    warn("%s", filename);
+    rval = EXIT_FAILURE;
+  }
+
+}
 
