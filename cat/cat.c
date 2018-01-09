@@ -9,18 +9,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <locale.h>
 
 static int bflag, eflag, fflag, lflag, nflag, sflag, tflag, vflag;
 static size_t bsize;
 static int rval;
 static const char *filename;
 
+void cook_buf( FILE *fp );
+void cook_args( char **argv );
+void raw_args(char **argv);
+void raw_cat( int rfd );
+
 int main(int argc, char *argv[]) {
 
   int ch;
   struct flock stdout_lock;
 
-  setprogram( argv[0] );
+//  setprogname( argv[0] );
 printf ( "argv[0] = %s", argv[0] );
   // 全てのロケールを環境変数依存に設定
   ( void )setlocale( LC_ALL, "" );
@@ -53,7 +59,7 @@ printf ( "argv[0] = %s", argv[0] );
           tflag = 1;
           break;
       case 'u':
-          uflag = 1;
+          setbuf(stdout, NULL);
           break;
       case 'v':
           vflag = 1;
@@ -63,7 +69,7 @@ printf ( "argv[0] = %s", argv[0] );
       // default と ?の位置は逆がセオリーでは?
       // ってかコレなら'?'は明記しなくても同一ルート通るのだが
       // 以下L66-L68は別関数にする方が見やすい
-          ( void )fprintf( stderr, "Usage: %s [-beflnstuv] [-B bsize] [-] " "[file ...]\n", getprogname() );
+          ( void )fprintf( stderr, "Usage: %s [-beflnstuv] [-B bsize] [-] " "[file ...]\n" );
           return EXIT_FAILURE;
       }
 // optindは外部変数
@@ -170,7 +176,7 @@ void cook_buf( FILE *fp ) {
             ch = toascii( ch );
           }
           if ( iscntrl( ch )) {
-            if ( putchar( '^' ) == EOF || putchar( ch == '177' ? '?' : ch | 0100 ) == EOF ) {
+            if ( putchar( '^' ) == EOF || putchar( ch == '\177' ? '?' : ch | 0100 ) == EOF ) {
               break;
             }
             continue;
@@ -192,7 +198,7 @@ void cook_buf( FILE *fp ) {
   }
 }
 
-void raw_args(charg **argv) {
+void raw_args(char **argv) {
   int fd;
 
   fd = fileno(stdin);
@@ -242,7 +248,7 @@ skipnomsg:
 
 void raw_cat( int rfd ) {
   static char *buf;
-  static cahr fb_buf[BUFSIZ];
+  static char fb_buf[BUFSIZ];
 
   ssize_t nr, nw, off;
   int wfd;
@@ -256,7 +262,7 @@ void raw_cat( int rfd ) {
     struct stat sbuf;
 
     if ( bsize == 0 ) {
-      if ( fstat( wfd, $sbuf ) == 0 && sbuf.st_blksize > 0 && (size_t)sbuf_st_blksize > sizeof( fb_buf) ) {
+      if ( fstat( wfd, &sbuf ) == 0 && sbuf.st_blksize > 0 && (size_t)sbuf.st_blksize > sizeof( fb_buf) ) {
         bsize = sbuf.st_blksize;
       }
     }
@@ -284,6 +290,5 @@ void raw_cat( int rfd ) {
     warn("%s", filename);
     rval = EXIT_FAILURE;
   }
-
 }
 
