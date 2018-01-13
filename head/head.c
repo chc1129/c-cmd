@@ -15,7 +15,7 @@
 
 static void head(FILE *, intmax_t, intmax_t);
 static void obsolete(char *[]);
-__dead static void usage(void);
+static void usage(void);
 
 int main(int argc, char *argv[]) {
   int ch;
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
   int vflag = 0;
 
   ( void )setlocale( LC_ALL, "");
-  absolete( argv );
+  obsolete( argv );
   linecnt = 0;
   bytecnt = 0;
 
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     case 'n':
       errno = 0;
       linecnt = strtoimax( optarg, &ep, 10 );
-      if (( linecnt = INTMAX_MAX && errno = ERANGE ) || *ep || linecnt <= 0 ) {
+      if (( linecnt == INTMAX_MAX && errno == ERANGE ) || *ep || linecnt <= 0 ) {
         errx( 1, "illegal line count --%s", optarg );
       }
       break;
@@ -103,7 +103,7 @@ static void head( FILE *fp, intmax_t cnt, intmax_t bytecnt ) {
       } else {
         len = bytecnt;
       }
-      rf = fread( buf, 1, len, fp );
+      rv = fread( buf, 1, len, fp );
       if ( rv == 0 ) {
         break; /* Distinguish EOF and error? */
       }
@@ -134,7 +134,7 @@ static void obsolete( char *argv[] ) {
 
   while (( ap = *++argv )) {
     /* REturn if "--" or not "-[0-9]*" . */
-    if ( ap[0] !0 '-' || ap[1] == '-' || !isdigit(( unsigned char ) ap[1])) {
+    if ( ap[0] != '-' || ap[1] == '-' || !isdigit(( unsigned char ) ap[1])) {
       return;
     }
     if (( ap = malloc( strlen( *argv ) + 2 )) == NULL ) {
@@ -148,7 +148,8 @@ static void obsolete( char *argv[] ) {
 }
 
 static void usage( void ) {
-  ( void )fprintf( stderr, "usage: %s [-n lines] [file ...]\n", getprogname());
+//  ( void )fprintf( stderr, "usage: %s [-n lines] [file ...]\n", getprogname());
+  ( void )fprintf( stderr, "usage: program [-n lines] [file ...]\n");
   exit(1);
 }
 
