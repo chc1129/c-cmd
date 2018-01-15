@@ -1,9 +1,11 @@
+#include <stdio.h>
+
 #define WR(p, size) \
   if ( write(STDOUT_FILENO, p, size) != size ) \
     oerr();
 
 enum STYLE {
-  NOTSET = 0;
+  NOTSET = 0,
   FBYTES,
   FLINES,
   RBYTES,

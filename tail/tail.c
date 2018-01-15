@@ -7,13 +7,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "extern.h"
+//#include "extern.h"
 
 int fflag, rflag, rval;
 const char *fname;
 
 static void obsolete(char **);
 static void usage(void);
+
+enum STYLE { NOTSET = 0, FBYTES, FLINES, RBYTES, RLINES, REVERSE };
 
 int main( int argc, char *argv[] ) {
   struct stat sb;
@@ -25,7 +27,7 @@ int main( int argc, char *argv[] ) {
   int qflag = 0;
   int vflag = 0;
 
-  setprogname( argv[0] );
+//  setprogname( argv[0] );
   off = 0;
 
 #define ARG( units, forward, backward ) {           \
@@ -50,8 +52,8 @@ int main( int argc, char *argv[] ) {
 }
 
   obsolete( argv );
-  style = NOTEST;
-  if ( strcmp( getprogname(), "tac" ) == 0 ) {
+  style = NOTSET;
+  if (( /* strcmp( getprogname(), "tac" */ 1 ) == 0 ) {
       qflag = 1;
       vflag = 0;
       rflag = 0;
@@ -118,7 +120,7 @@ int main( int argc, char *argv[] ) {
    * If style not specified, the default is the whole file for -r, and
    * the last 10 lines if not -r.
    */
-  if ( style == NOTEST ) {
+  if ( style == NOTSET ) {
     if ( rflag ) {
       off = 0;
       style = REVERSE;
@@ -179,7 +181,7 @@ int main( int argc, char *argv[] ) {
  * the option argument for a -b, -c or -n option gets converted.
  */
 static void obsolete( char *argv[] ) {
-  char *ap, *p. *t;
+  char *ap, *p, *t;
   int len;
   char *start;
 
@@ -279,7 +281,7 @@ static void obsolete( char *argv[] ) {
 }
 
 static void usage( void ) {
-  ( void )fprintf( stderr, "Usage: %s [-qv] [-f | -F | -r] [-b # | -c # | -n #] [file ...]\n", getprogname() );
+//  ( void )fprintf( stderr, "Usage: %s [-qv] [-f | -F | -r] [-b # | -c # | -n #] [file ...]\n", getprogname() );
   exit(1);
 }
 
