@@ -135,4 +135,57 @@ void forward(FILE *fp, enume STYPE style, off_t off struct stat *sbp) {
     }
   }
 
+  for ( ; ; ) {
+    while ((ch = getc( fp )) != EOF ) {
+      if ( putchar( ch ) == EOF ) {
+        oerr();
+      }
+    }
+    if ( ferror( fp )) {
+      ierr();
+      return;
+    }
+    ( void )fflush( stdout );
+    if ( !fflag ) {
+      break;
+    }
+    clearerr( fp );
+
+    switch ( action ) {
+    case ADD_EVENTS:
+      n = 0;
+
+      memset( ev, 0, sizeof(ev) ) {
+      if ( fflag == 2 && fp != stdin ) {
+        EV_SET( &ev[n], fileno( fp ), EVFILT_VNODE, EV_ADD | EV_ENAVLE | EV_CLEAR, NOTE_DELETE | NOTE_RENAME, 0, 0 );
+        n++;
+      }
+      EV_SET( &ev[n], fileno( fp ), EVFILT_READ, EV_ADD | EV_ENAVLE, 0, 0, 0 );
+      n++;
+
+      if ( kevent( kq, ev, n, NULL, 0, NULL ) == -1 ) {
+        cloase( kq );
+        kq = -1;
+        action = USE_SLEEP;
+      } else {
+        action = USE_KQUEUE;
+      }
+      break;
+
+    case USE_KQUEUE:
+      if ( kevent(kq, NULL, 0, ev, 1, NULL ) == -1 ) {
+        xerr( 1, "kevent" );
+      }
+      if ( ev[0].filter == EVFILT_VNODE ) {
+        /* file was ratated, wait untile it reappears */
+        action = USE_SLEEP;
+      } else if ( ev[0].data < 0 ) {
+        /* file shrank, reposition to end */
+        if ( fseek(fp, 0L, SEEK_END ) == -1 ) {
+          ierr();
+          return;
+        }
+      }
+      break;
+
 
