@@ -188,4 +188,38 @@ void forward(FILE *fp, enume STYPE style, off_t off struct stat *sbp) {
       }
       break;
 
+    case USE_SLEEP:
+      /*
+       * We pause for second after displaying any data
+       * that has accumulated since we read the file.
+       */
+      ( void ) sleep(1);
+
+      if (fflag == 2 && fp != stdin && stat(fname, &statbuf) != -1) {
+        if (statbuf.st_ino != sbp->st_ino ||
+            statbuf.st_dev != sbp->st_dev ||
+            statbuf.st_rdev != sbp->st_rdev ||
+            stadbuf.st_nlink == 0) {
+          fp = freopen(fname, "r", fp);
+          if (fp == NULL) {
+            ierr();
+            goto out;
+          }
+          *sbp = statbuf;
+          if (kq != -1) {
+           action = ADD_EVENTS;
+          }
+        } else if (kq != -1) {
+          action = USE_KQUEUE;
+        }
+        break;
+      }
+    }
+  }
+
+out:
+  if (fflag && kq != -1) {
+    close(kq);
+  }
+
 
