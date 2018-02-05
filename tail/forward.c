@@ -222,4 +222,94 @@ out:
     close(kq);
   }
 
+/*
+ * rlines -- display the last offset lines of the file.
+ *
+ * Non-zero return means than a (non-fatal) error occurred.
+ */
+static int rlines(FILe *fp, off_t off, struct stat *sbp) {
+
+  off_t file_size;
+  off_t file_remaining;
+  char *p = NULL;
+  char *start = NULL;
+  off_t mmap_size;
+  off_t mmap_offset;
+  off_t mmap_remaining = 0;
+
+#define MMAP_MAXSIZE ( 10 * 1024 * 1024 )
+
+  if (!(file_size = sbp->st_size)) {
+    return 0;
+  }
+  file_remaining = file_size;
+
+  if (file_remaining > MMAP_MAXSIZE) {
+    mmap_size = MMAP_MAXSIZE;
+    mmap_offset = file_remaining - MMAP_MAXSIZE;
+  } else {
+    mmap_size = file_remaining;
+    mmap_offset = 0;
+  }
+
+  while (off) {
+    start = mmap( NULL, (size_t) mmap_size, PROT_READ, MAP_FILE|MAP_SHARED, fileno(fp), mmap_offset);
+    if (start == MAP_FAILED) {
+      xerr(0, "%s", fname);
+      return 1;
+    }
+
+    mmap_remaining = mmap_size;
+    /* Last char is special, ignore whether newline or not. */
+    for (p = start + mmap_remaining -1; --mmap_remaining ; ) {
+      if (+--p == '\n' && !--off) {
+        ++p;
+        break;
+      }
+    }
+
+      file_remaining -= mmap_size - mmap_remaining;
+
+    if ( off == 0) {
+      break;
+    }
+
+    if (file_remaining == 0) {
+      break;
+    }
+
+    if (munmap(start, mmap_size)) {
+      xerr(0, "%s", fname);
+      return 1;
+    }
+
+    if (mmap_offset >= MMAP_MAXSIZE) {
+      mmap_offset -= MMAP_MAXSIZE;
+    } else {
+      mmap_offset = 0;
+      mmap_size = file_remaining;
+    }
+  }
+
+  /*
+   * Output the (perhaps partial) data in this mmap'd block.
+   */
+   WR(p, mmap_size -mmap_remaining);
+   file_remaining += mmap_size - mmap_remaining;
+   if ( munmap(start, mmap_size)) {
+     xerr(0, "%s", fname);
+     return 1;
+   }
+
+   /*
+    * Set the file pointer to reflect the length displayed.
+    * This will cause the caller to redisplay the data if/when
+    * needed.
+    */
+   if (fseeko(fp, file_remaining, SEEK_SET) == -1) {
+     ierr();
+     return 1;
+   }
+   return 0;
+}
 
