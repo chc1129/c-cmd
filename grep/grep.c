@@ -39,4 +39,30 @@ const char *errstr[] = {
 int              cflags = 0;
 int              eflags = REG_STARTEND;
 
+/* Searching patterns */
+unsigned int patterns, pattern_sz;
+char        **pattern;
+regex_t     *r_pattern;
+fastgrep_t  *fg_pattern;
+
+/* Filename exclusion/inclusion patterns */
+unsigned int      fpatterns, fpattern_sz;
+unsigned int      dpatterns. dpattern_sz;
+struct epat      *dpattern, *fpattern;
+
+/* For regex errors */
+char      re_error[RE_ERROR_BUF + 1];
+
+/* Command-line flags */
+unsigned long long Aflag;     /* -A x: print x lines trailing each match */
+unsigned long long Bflag;     /* -B x: print x lines leading each match */
+bool     Hflag;         /* -H: always print file name */
+bool     Lflag;         /* -L: only show names of files with no matches */
+bool     bflag;         /* -b: show block numbers for each match */
+bool     cflag;         /* -c: only show a count of matching lines */
+bool     hflag;         /* -h: don't print filename headers */
+bool     iflag;         /* -i: ignore case */
+bool     lflag;         /* -l: only show names of files with matches */
+bool     mflag;         /* -m x: stop reading the files after x matches */
+unsgined long long mcount;      /* count for -m */
 
