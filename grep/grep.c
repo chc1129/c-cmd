@@ -65,4 +65,15 @@ bool     iflag;         /* -i: ignore case */
 bool     lflag;         /* -l: only show names of files with matches */
 bool     mflag;         /* -m x: stop reading the files after x matches */
 unsgined long long mcount;      /* count for -m */
+bool     nflag;         /* -n: show line numbers in front of matching lines */
+bool     oflag;         /* -o: print only matching part */
+bool     qflag;         /* -q: quiet mode (don't output anything) */
+bool     sflag;         /* -s: silent mode (ignore errors) */
+bool     vflag;         /* -v: only show non-matching lines */
+bool     wflag;         /* -w: pattern must start and end on word boundaries */
+bool     xflag;         /* -x: pattern must match entire lines */
+bool     lbflag;        /* --line-bufered */
+bool     nullflag;      /* --null */
+bool     nulldataflag;  /* --null-data */
+unsgined char line_sep = '\n'; /* 0 for --null-data */
 
