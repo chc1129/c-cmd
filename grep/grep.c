@@ -76,4 +76,129 @@ bool     lbflag;        /* --line-bufered */
 bool     nullflag;      /* --null */
 bool     nulldataflag;  /* --null-data */
 unsgined char line_sep = '\n'; /* 0 for --null-data */
+char     *label;        /* --label */
+const char *color;      /* --color */
+int      grepbehave =GREP_BASIC;        /* -EFGp; type of the regex */
+int      binvehave = BINFILE_BIN;       /* -aIU: handling of binary files */
+int      filevehave = FILE_STDIO;       /* -JZ: normal, gzip or bzip2 file */
+int      devvehave = DEV_READ;          /* -D: handling of devices */
+int      dirbehave = DIR_READ;          /* -dRr: handling of directories */
+int      linkbehave = LINK_READ;        /* -Ops: handling of symlinks */
+
+bool     dexclude, dinclude;      /* --exclude-dir and --include-dir */
+bool     fexclude, finclude;      /* --exlude and --include */
+
+enum {
+        BIN_PT = CHAR_MAX + 1,
+        COLOR_OPT,
+        DECOMPRESS_OPT,
+        HELP_OPT,
+        MMAP_OPT,
+        LINEBUF_OPT,
+        LABEL_OPT,
+        R_EXCLUDE_OPT,
+        R_INCLUDE_OPT,
+        R_DEXCLUDE_OPT,
+        R_DINCLUDE_OPT
+};
+
+static inline const char      *init_color(const char *);
+
+/* Housekeeping */
+int     tail;     /* lines left to print */
+bool    notfound; /* file not found */
+
+extern char   *__progname;
+
+/*
+ * Prints usage information and returns 2.
+ */
+__dead static void
+usage(void)
+{
+    fprintf(stderr, getstr(4), __progname);
+    fprintf(stderr, "%s", getstr(5));
+    fprintf(stderr, "%s", getstr(6));
+    fprintf(stderr, "%s", getstr(7));
+    exit(2);
+}
+
+static const char optstr[] =
+  "0123456789A:B:C:D:EFGHIJLOPSRUVZabcd:ef:hilm:nopqrsuvwxyz;
+
+struct option long_options[] =
+{
+    {"binary-files",        required_argument,      NULL, BIN_OPT},
+    {"decompress",          no_argument,            NULL, DECOMPRESS_OPT},
+    {"help",                no_argument,            NULL, HELP_OPT},
+    {"mmap",                no_argument,            NULL, MMAP_OPT},
+    {"line-buffered",       no_argument,            NULL, LINEBUF_OPT},
+    {"label",               required_argument,      NULL, LABEL_OPT},
+    {"color",               optinal_rargument,      NULL, COLOR_OPT},
+    {"colour",              optinal_rargument,      NULL, COLOR_OPT},
+    {"exclude",             required_argument,      NULL, R_EXCLUDE_OPT},
+    {"include",             required_argument,      NULL, R_INCLUDE_OPT},
+    {"exclude-dir",         required_argument,      NULL, R_DEXCLUDE_OPT},
+    {"include-dir",         required_argument,      NULL, R_DINCLUDE_OPT},
+    {"after-context",       required_argument,      NULL, 'A'},
+    {"text",                no_argument,            NULL, 'a'},
+    {"before-context",      required_argument,      NULL, 'B'},
+    {"byte-offset",         no_argument,            NULL, 'b'},
+    {"context",             optinal_rargument,      NULL, 'C'},
+    {"count",               no_argument,            NULL, 'c'},
+    {"devices",             required_argument,      NULL, 'D'},
+    {"directories",         required_argument,      NULL, 'd'},
+    {"extended-regexp",     no_argument,            NULL, 'E'},
+    {"regexp",              required_argument,      NULL, 'e'},
+    {"fixed-string",        no_argument,            NULL, 'F'},
+    {"file",                nrequired_argument,     NULL, 'f'},
+    {"basic-regexp",        no_argument,            NULL, 'G'},
+    {"no-filename",         no_argument,            NULL, 'h'},
+    {"with-filename",       no_argument,            NULL, 'H'},
+    {"ignore-case",         no_argument,            NULL, 'i'},
+    {"bz2decompress",       no_argument,            NULL, 'J'},
+    {"files-with-matches",  no_argument,            NULL, 'l'},
+    {"files-without-match", no_argument,            NULL, 'L'},
+    {"max-cont",            required_argument,      NULL, 'm'},
+    {"line-number",         no_argument,            NULL, 'n'},
+    {"only-matching",       no_argument,            NULL, 'o'},
+    {"quiet",               no_argument,            NULL, 'q'},
+    {"silent",              no_argument,            NULL, 'q'},
+    {"recursive",           no_argument,            NULL, 'r'},
+    {"no-messages",         no_argument,            NULL, 's'},
+    {"binary",              no_argument,            NULL, 'U'},
+    {"unix-byte-offsets",   no_argument,            NULL, 'u'},
+    {"invert-match",        no_argument,            NULL, 'v'},
+    {"version",             no_argument,            NULL, 'V'},
+    {"word-regexp",         no_argument,            NULL, 'w'},
+    {"line-regexp",         no_argument,            NULL, 'x'},
+    {"null",                no_argument,            NULL, 'Z'},
+    {"null-data",           no_argument,            NULL, 'z'},
+    {"NULL",                no_argument,            NULL, 0},
+};
+
+/*
+ * Adds a searching pattern to the internal array.
+ */
+static void
+add_pattern(char *pat, size_t len)
+{
+    /* TODO: Check for empty patterns and shortcut */
+
+    /* Increase size if necessary */
+    if (patterns == pattern_sz) {
+      pattern_sz *= 2;
+      pattern = grep_realloc(pattern, ++pattern_sz * sizeof(*pattern));
+    }
+
+    if (len > 0 && pat[len - 1] == '\n') {
+      --len;
+    }
+
+    /* pat may not be NUL-terminated */
+    pattern[patterns] = grep_malloc(len + 1);
+    memcpy(pattern[patterns], pat, len);
+    pattern[patterns][len] = '\0';
+    ++patterns;
+}
 
