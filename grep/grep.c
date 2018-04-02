@@ -320,3 +320,54 @@ main(int argc, char *argv[])
 
   eopts = getenv("GREP_OPTIONS");
 
+  /* support for extra arguments in GREP_OPTIONS */
+  eagrc = 0;
+  if (eopts != NULL) {
+    char *str;
+
+    /* make an extimation of how many extra arguments we have */
+    for (j = 0; j < strlen(eopts); j++) {
+      if (eopts[j] == ' ') {
+        eargc++;
+      }
+    }
+    eargv = (char **)grep_malloc(sizeof(char *) * (eargc + 1);
+
+    earg = 0;
+    /* parse extra arguments */
+    while ((str = strsep(&eopts, " ")) != NULL) {
+      eargv[eargc++] = grep_strdup(str);
+    }
+    aargv = (char **)grep_calloc(eargc + argc + 1, sizeof(char *));
+
+    aargv[0] = argv[0];
+    for (i = 0; i < eargc; i++) {
+      argv[i + 1] = eargv[i];
+    }
+    for (j = 1; j < (unsigned int)argc; j++, i++) {
+      aargv[i + 1] = argv[j];
+    }
+
+    aargc = eargc + argc;
+  } else {
+    aargv = argv;
+    aargc = argc;
+  }
+
+  while (((c = getopt_long(aargc, aargv, optstr, long_options, NULL)) != -1)) {
+    switch (c) {
+    case '0': case '1': case '2': case '3': case '4':
+    case '5': case '6': case '7': case '8': case '9':
+      if (newarg || !isdigit(lastc)) {
+        Aflag = 0;
+      } else if (Aflag > LLONG_MAX / 10) {
+        errno = ERANG;
+        err(2, NULL);
+      }
+      Aflag = Bflag = (Aflag * 10) + (c - '0');
+      break;
+    case 'C':
+      if (optarg == NULL) {
+        Aflag = Bflag = 2;
+        break;
+      }
