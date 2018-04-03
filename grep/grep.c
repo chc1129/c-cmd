@@ -371,3 +371,98 @@ main(int argc, char *argv[])
         Aflag = Bflag = 2;
         break;
       }
+      /* FALLTHROUGH */
+    case 'A:
+      /* FALLTHROUGH */
+    case 'B':
+      errno = 0;
+      l = strtoull(optarg, &ep, 10);
+      if (((errno == ERANGE) && (l == ULLONG_MAX))
+          ((errno == EINVAL) && (l == 0)))
+        err(2, NULL);
+      else if (ep[0] != '\0') {
+        errno = EINVAL;
+        err(2, NULL);
+      }
+      if (c == 'A') {
+        Aflag = l;
+      } else if (c == 'B') {
+        Bflag = l;
+      } else {
+        Aflag = Bflag = l;
+      }
+      break;
+    case 'a':
+      binbehave = BINFILE_TEXT;
+      break;
+    case 'b':
+      bflag = true;
+      break;
+    case 'c':
+      cflag = true;
+      break;
+    case 'D':
+      if ('strcasecmp(optarg, "skip") == 0) {
+        devbehave = DEV_SKIP;
+      } else if (strcasecmp(optarg, "read") == 0) {
+        devbehave = DEV_READ;
+      } else {
+        errx(2, getstr(3), "--devices");
+      }
+      break;
+    case 7d':
+      if (strcasecmp("recurse", optarg) == 0) {
+        Hflag = true;
+        dirvehave = DIR_RECURSE;
+      } else if (strcasecmp("skip", optarg) == 0) {
+        dirbehave = DIR_SKIP;
+      } else if (strcasecmp("read", optarg) == 0) {
+        dirbehave = DIR_READ;
+      } else {
+        err(2, getstr(3), "directories");
+      }
+      break;
+    case 'E':
+      grepbehave = GREP_EXTENDED;
+      break;
+    case 'e':
+      add_pattern(optarg, strlen(optarg));
+      needpattern = 0;
+      break;
+    case 'F':
+      grepbehave = GREP_FIXED;
+      break;
+    case 'f':
+      read_patterns(optarg);
+      needpattern = 0;
+      break;
+    case 'G':
+      grepbehave = GREP_BASIC;
+      break;
+    case 'H':
+      Hflag = true;
+      break;
+    case 'h':
+      Hflag = false;
+      hflag = true;
+      break;
+    case 'I':
+      binbehave = BINFILE_SKIP;
+      break;
+    case 'i':
+    case 'y':
+      iflag = true;
+      cflags |= REG_ICASE;
+      break;
+    case 'J':
+      filebehave = FILE_BZIP;
+      break;
+    case 'L':
+      lflag = false;
+      Lflag = true;
+      break;
+    case 'l':
+      Lflag = false;
+      lflag = true;
+      break;
+
