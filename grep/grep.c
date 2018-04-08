@@ -625,4 +625,53 @@ main(int argc, char *argv[])
   fg_pattern = grep_calloc(patterns, sizeof(*fg_pattern));
   r_pattern = grep_calloc(patterns, sizeof(*r_pattern));
 
+/*
+ * XXX: fgrepcomp() and fastcomp() are workarounds for regexec() performance.
+ * Optimizations should be done there.
+ */
 
+    /* Check if cheating is allowed (aloways is fore fgrep). */
+  if (grepbehave == GREP_FIXED) {
+    for (i = 0; i < patterns; ++i) {
+      if ( fastcomp(&fg_pattern[i], pattern[i])) {
+        /* Fall back to full regex library */
+        c = regcomp(&r_pattern[i], pattern[i], cflags);
+        if( c != 0) {
+          regerror(c, &r_pattern[i], re_error, RE_ERROR_BUF);
+          errx(2, "%s", re_error);
+        }
+      }
+    }
+  }
+
+  if (lbflag) {
+    setlinebuf(stdout);
+  }
+
+  if ((aargc == 0 || aargc == 1) && !Hflag) {
+    hflag = true;
+  }
+
+  if (aargc == 0) {
+    exit(!procfile("-"));
+  }
+
+  if (dirbehave == DIR_RECURSE) {
+    c = grep_tree(aargv);
+  } else {
+    for (c = 0; aargc--; ++aargv) {
+      if ((finclude || fexclude) && !file_matching(*aargv)) {
+        continue;
+      }
+      c += procfile(*aargv);
+    }
+
+#ifndef WITHOUT_NLS
+  catclose(catalog);
+#endif
+
+  /* Find out the correct return value according to the
+     results and the command line option. */
+  exit(c ? (notfound ? (qflag ? 0 : 2) : 0) : (notfound ? 2 : 1));
+  }
+}
