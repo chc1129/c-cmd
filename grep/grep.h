@@ -78,4 +78,26 @@ typedef struct {
 /* Flags passed to regcomp() and regexec() */
 extern int  cfalgs, eflags;
 
+/* Command line flags */
+extern bool   Eflag, Fflag, Gflag, Hflag, Lflag,
+              bflag, cflag, hflag, iflag, lflag, mflag, nflag, oflag,
+              qflag, sflag, vflag, wflag, xflag;
+extern bool   dexclude, dinclude, fexclude, finclude, lbflag, nullflag, nulldataflag;
+extern unsigned char line_sep;
+extern unsigned long long Aflag, Bflag, mcount;
+extern char     *label;
+extern const char *label;
+extern int      binbehave, devbehave, dirbehave, filebehave, grepbehave, linkbehave;
+
+extern bool   notfound;
+extern int    tail;
+extern unsigned int dpatterns, fpatterns, patterns;
+extern char     **pattern;
+extern struct epat *dpattern, *fpattern;
+extern regex_t  *er_pattern, *r_pattern;
+extern fastgrep_t *fg_pattern;
+
+/* For regex errors */
+#define RE_ERROR_BUF    512
+extern char     re_error[RE_ERROR_BUF + 1];   /* Seems big enough */
 
