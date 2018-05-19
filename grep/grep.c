@@ -115,7 +115,7 @@ bool    notfound; /* file not found */
 static void
 usage(void)
 {
-    fprintf(stderr, getstr(4), getprogname());
+    fprintf(stderr, getstr(4), progname());
     fprintf(stderr, "%s", getstr(5));
     fprintf(stderr, "%s", getstr(6));
     fprintf(stderr, "%s", getstr(7));
@@ -125,6 +125,11 @@ usage(void)
 static const char optstr[] =
   "0123456789A:B:C:D:EFGHIJLOPSRUVZabcd:ef:hilm:nopqrsuvwxyz";
 
+
+enum {
+    BIN_OPT = CHAR_MAX + 1,
+};
+
 struct option long_options[] =
 {
     {"binary-files",        required_argument,      NULL, BIN_OPT},
@@ -133,7 +138,7 @@ struct option long_options[] =
     {"mmap",                no_argument,            NULL, MMAP_OPT},
     {"line-buffered",       no_argument,            NULL, LINEBUF_OPT},
     {"label",               required_argument,      NULL, LABEL_OPT},
-    {"color",               optional_argument,       NULL, COLOR_OPT},
+    {"color",               optional_argument,      NULL, COLOR_OPT},
     {"colour",              optional_argument,      NULL, COLOR_OPT},
     {"exclude",             required_argument,      NULL, R_EXCLUDE_OPT},
     {"include",             required_argument,      NULL, R_INCLUDE_OPT},
@@ -360,7 +365,7 @@ main(int argc, char *argv[])
       if (newarg || !isdigit(lastc)) {
         Aflag = 0;
       } else if (Aflag > LLONG_MAX / 10) {
-        errno = ERANG;
+        errno = ERANGE;
         err(2, NULL);
       }
       Aflag = Bflag = (Aflag * 10) + (c - '0');
@@ -510,7 +515,8 @@ main(int argc, char *argv[])
       /* noop, compatibility */
       break;
     case 'V':
-      printf(getstr(9), getprogname(), VERSION);
+//      printf(getstr(9), getprogname(), VERSION);
+      printf(getstr(9), getprogname(), "");
       exit(0);
     case 'v':
       vflag = true;
