@@ -115,7 +115,7 @@ bool    notfound; /* file not found */
 static void
 usage(void)
 {
-    fprintf(stderr, getstr(4), progname());
+    fprintf(stderr, getstr(4), getprogname());
     fprintf(stderr, "%s", getstr(5));
     fprintf(stderr, "%s", getstr(6));
     fprintf(stderr, "%s", getstr(7));
