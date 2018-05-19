@@ -3,13 +3,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <stype.h>
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <getopt.h>
 #include <limits.h>
 #include <libgen.h>
-#include <local.h>
+#include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,7 +47,7 @@ fastgrep_t  *fg_pattern;
 
 /* Filename exclusion/inclusion patterns */
 unsigned int      fpatterns, fpattern_sz;
-unsigned int      dpatterns. dpattern_sz;
+unsigned int      dpatterns, dpattern_sz;
 struct epat      *dpattern, *fpattern;
 
 /* For regex errors */
@@ -64,7 +64,7 @@ bool     hflag;         /* -h: don't print filename headers */
 bool     iflag;         /* -i: ignore case */
 bool     lflag;         /* -l: only show names of files with matches */
 bool     mflag;         /* -m x: stop reading the files after x matches */
-unsgined long long mcount;      /* count for -m */
+unsigned long long mcount;      /* count for -m */
 bool     nflag;         /* -n: show line numbers in front of matching lines */
 bool     oflag;         /* -o: print only matching part */
 bool     qflag;         /* -q: quiet mode (don't output anything) */
@@ -75,7 +75,7 @@ bool     xflag;         /* -x: pattern must match entire lines */
 bool     lbflag;        /* --line-bufered */
 bool     nullflag;      /* --null */
 bool     nulldataflag;  /* --null-data */
-unsgined char line_sep = '\n'; /* 0 for --null-data */
+unsigned char line_sep = '\n'; /* 0 for --null-data */
 char     *label;        /* --label */
 const char *color;      /* --color */
 int      grepbehave =GREP_BASIC;        /* -EFGp; type of the regex */
@@ -108,15 +108,14 @@ static inline const char      *init_color(const char *);
 int     tail;     /* lines left to print */
 bool    notfound; /* file not found */
 
-extern char   *__progname;
 
 /*
  * Prints usage information and returns 2.
  */
-__dead static void
+static void
 usage(void)
 {
-    fprintf(stderr, getstr(4), __progname);
+    fprintf(stderr, getstr(4), getprogname());
     fprintf(stderr, "%s", getstr(5));
     fprintf(stderr, "%s", getstr(6));
     fprintf(stderr, "%s", getstr(7));
@@ -124,7 +123,7 @@ usage(void)
 }
 
 static const char optstr[] =
-  "0123456789A:B:C:D:EFGHIJLOPSRUVZabcd:ef:hilm:nopqrsuvwxyz;
+  "0123456789A:B:C:D:EFGHIJLOPSRUVZabcd:ef:hilm:nopqrsuvwxyz";
 
 struct option long_options[] =
 {
@@ -134,8 +133,8 @@ struct option long_options[] =
     {"mmap",                no_argument,            NULL, MMAP_OPT},
     {"line-buffered",       no_argument,            NULL, LINEBUF_OPT},
     {"label",               required_argument,      NULL, LABEL_OPT},
-    {"color",               optinal_rargument,      NULL, COLOR_OPT},
-    {"colour",              optinal_rargument,      NULL, COLOR_OPT},
+    {"color",               optional_argument,       NULL, COLOR_OPT},
+    {"colour",              optional_argument,      NULL, COLOR_OPT},
     {"exclude",             required_argument,      NULL, R_EXCLUDE_OPT},
     {"include",             required_argument,      NULL, R_INCLUDE_OPT},
     {"exclude-dir",         required_argument,      NULL, R_DEXCLUDE_OPT},
@@ -144,14 +143,14 @@ struct option long_options[] =
     {"text",                no_argument,            NULL, 'a'},
     {"before-context",      required_argument,      NULL, 'B'},
     {"byte-offset",         no_argument,            NULL, 'b'},
-    {"context",             optinal_rargument,      NULL, 'C'},
+    {"context",             optional_argument,      NULL, 'C'},
     {"count",               no_argument,            NULL, 'c'},
     {"devices",             required_argument,      NULL, 'D'},
     {"directories",         required_argument,      NULL, 'd'},
     {"extended-regexp",     no_argument,            NULL, 'E'},
     {"regexp",              required_argument,      NULL, 'e'},
     {"fixed-string",        no_argument,            NULL, 'F'},
-    {"file",                nrequired_argument,     NULL, 'f'},
+    {"file",                required_argument,      NULL, 'f'},
     {"basic-regexp",        no_argument,            NULL, 'G'},
     {"no-filename",         no_argument,            NULL, 'h'},
     {"with-filename",       no_argument,            NULL, 'H'},
@@ -206,7 +205,7 @@ add_pattern(char *pat, size_t len)
  * Adds a file include/exclude pattern to the internal array.
  */
 static void
-add_fpattern(const char *pat. int mode)
+add_fpattern(const char *pat, int mode)
 {
   /* Increase size if necessary */
   if (fpatterns == fpattern_sz) {
@@ -227,7 +226,7 @@ add_dpattern(const char *pat, int mode)
   /* Increase size if necessary */
   if (dpatterns == dpattern_sz) {
     dpattern_sz *= 2;
-    dpattern = grep_realloc(dpattern. ++dpattern_sz * sizeof(struct epat));
+    dpattern = grep_realloc(dpattern, ++dpattern_sz * sizeof(struct epat));
   }
   dpattern[dpatterns].pat = grep_strdup(pat);
   dpattern[dpatterns].mode = mode;
@@ -238,7 +237,7 @@ add_dpattern(const char *pat, int mode)
  * Reads searching patterns from a file and adds them with add_pattern().
  */
 static void
-read_patterns(cons char *fn)
+read_patterns(const char *fn)
 {
   FILE *f;
   char *line;
@@ -248,14 +247,14 @@ read_patterns(cons char *fn)
   if ((f = fopen(fn, "r")) == NULL) {
     err(2, "%s", fn);
   }
-  lien = NULL;
+  line = NULL;
   len = 0;
   while ((rlen = getline(&line, &len, f)) != -1) {
     add_pattern(line, *line == '\n' ? 0 : (size_t)rlen);
   }
   free(line);
   if (ferror(f)) {
-    err(2 "%s", fn);
+    err(2, "%s", fn);
   }
   fclose(f);
 }
@@ -278,7 +277,7 @@ main(int argc, char *argv[])
   unsigned int aargc, eargc, i, j;
   int c, lastc, needpattern, newarg, prevoptind;
 
-  setlocal(LC_ALL, "");
+  setlocale(LC_ALL, "");
 
 #ifndef WITHOUT_NLS
   catalog = catopen("grep", NL_CAT_LOCALE);
@@ -287,7 +286,7 @@ main(int argc, char *argv[])
   /* Check what is the program name of the binary. In this
      way ew can have all the functionalities in one binary
      without the need of scriptin and using ugly hacks. */
-  switch (__progname[0]) {
+  switch (getprogname()) {
   case 'e':
     grepbehave = GREP_EXTENDED;
     break;
@@ -299,7 +298,7 @@ main(int argc, char *argv[])
     break;
   case 'z':
     filebehave = FILE_GZIP;
-    switch(__progname[1]) {
+    switch(getprogname()) {
     case 'e':
       grepbehave = GREP_EXTENDED;
       break;
@@ -321,7 +320,7 @@ main(int argc, char *argv[])
   eopts = getenv("GREP_OPTIONS");
 
   /* support for extra arguments in GREP_OPTIONS */
-  eagrc = 0;
+  eargc = 0;
   if (eopts != NULL) {
     char *str;
 
@@ -331,9 +330,9 @@ main(int argc, char *argv[])
         eargc++;
       }
     }
-    eargv = (char **)grep_malloc(sizeof(char *) * (eargc + 1);
+    eargv = (char **)grep_malloc(sizeof(char *) * (eargc + 1));
 
-    earg = 0;
+    eargc = 0;
     /* parse extra arguments */
     while ((str = strsep(&eopts, " ")) != NULL) {
       eargv[eargc++] = grep_strdup(str);
@@ -372,12 +371,12 @@ main(int argc, char *argv[])
         break;
       }
       /* FALLTHROUGH */
-    case 'A:
+    case 'A':
       /* FALLTHROUGH */
     case 'B':
       errno = 0;
       l = strtoull(optarg, &ep, 10);
-      if (((errno == ERANGE) && (l == ULLONG_MAX))
+      if (((errno == ERANGE) && (l == ULLONG_MAX)) ||
           ((errno == EINVAL) && (l == 0)))
         err(2, NULL);
       else if (ep[0] != '\0') {
@@ -402,7 +401,7 @@ main(int argc, char *argv[])
       cflag = true;
       break;
     case 'D':
-      if ('strcasecmp(optarg, "skip") == 0) {
+      if (strcasecmp(optarg, "skip") == 0) {
         devbehave = DEV_SKIP;
       } else if (strcasecmp(optarg, "read") == 0) {
         devbehave = DEV_READ;
@@ -410,10 +409,10 @@ main(int argc, char *argv[])
         errx(2, getstr(3), "--devices");
       }
       break;
-    case 7d':
+    case 'd':
       if (strcasecmp("recurse", optarg) == 0) {
         Hflag = true;
-        dirvehave = DIR_RECURSE;
+        dirbehave = DIR_RECURSE;
       } else if (strcasecmp("skip", optarg) == 0) {
         dirbehave = DIR_SKIP;
       } else if (strcasecmp("read", optarg) == 0) {
@@ -511,7 +510,7 @@ main(int argc, char *argv[])
       /* noop, compatibility */
       break;
     case 'V':
-      printf(getstr(9), __progname, VERSION);
+      printf(getstr(9), getprogname(), VERSION);
       exit(0);
     case 'v':
       vflag = true;
@@ -577,15 +576,15 @@ main(int argc, char *argv[])
       break;
     case R_EXCLUDE_OPT:
       fexclude = true;
-      add_fpattern(optarng, EXCL_PAT);
+      add_fpattern(optarg, EXCL_PAT);
       break;
     case R_DINCLUDE_OPT:
       dinclude = true;
       add_dpattern(optarg, INCL_PAT);
       break;
-    case _R_DEXCLUDE_OPT:
+    case R_DEXCLUDE_OPT:
       dexclude = true;
-      add_dapttern(optarg, EXCL_PAT);
+      add_dpattern(optarg, EXCL_PAT);
       break;
     case HELP_OPT:
     default:
@@ -607,7 +606,7 @@ main(int argc, char *argv[])
   if (aargc != 0 && needpattern) {
     add_pattern(*aargv, strlen(*aargv));
     --aargc;
-    ++aargv+
+    ++aargv;
   }
 
   switch (grepbehave) {
@@ -632,6 +631,10 @@ main(int argc, char *argv[])
 
     /* Check if cheating is allowed (aloways is fore fgrep). */
   if (grepbehave == GREP_FIXED) {
+    for (i = 0; i < patterns; ++i) {
+      fgrepcomp(&fg_pattern[i], pattern[i]);
+    }
+  } else {
     for (i = 0; i < patterns; ++i) {
       if ( fastcomp(&fg_pattern[i], pattern[i])) {
         /* Fall back to full regex library */

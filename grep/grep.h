@@ -10,11 +10,11 @@
 #else
 #include <nl_types.h>
 
-extern nl_catad     catalog;
+extern nl_catd     catalog;
 #define getstr(n)   catgets(catalog, 1, n, errstr[n])
 #endif
 
-extern const cahr   *errstr[];
+extern const char   *errstr[];
 
 #define VIERSION    "2.5.1-FreeBSD"
 
@@ -86,7 +86,7 @@ extern bool   dexclude, dinclude, fexclude, finclude, lbflag, nullflag, nulldata
 extern unsigned char line_sep;
 extern unsigned long long Aflag, Bflag, mcount;
 extern char     *label;
-extern const char *label;
+extern const char *color;
 extern int      binbehave, devbehave, dirbehave, filebehave, grepbehave, linkbehave;
 
 extern bool   notfound;
@@ -100,4 +100,29 @@ extern fastgrep_t *fg_pattern;
 /* For regex errors */
 #define RE_ERROR_BUF    512
 extern char     re_error[RE_ERROR_BUF + 1];   /* Seems big enough */
+
+/* utile.c */
+bool  file_matching(const char *fname);
+int   procfile(const char *fn);
+int   grep_tree(char **argv);
+void  *grep_malloc(size_t nsize);
+void  *grep_calloc(size_t nmemb, size_t size);
+void  *grep_realloc(void *ptr, size_t size);
+void  *grep_strdup(const char *str);
+void  grep_printline(struct str *line, int sep);
+
+/* queue.c */
+bool  enqueue(struct str *x);
+void  printqueue(void);
+void  clearqueue(void);
+
+/* file.c */
+void          grep_close(struct file *f);
+struct file   *grep_open(const char *path);
+char          *grep_fgetln(struct file *f, size_t *len);
+
+/* fastgrep.c */
+int   fastcomp(fastgrep_t *, const char *);
+void  fgrepcomp(fastgrep_t *, const char *);
+int   grep_search(fastgrep_t *, const unsigned char *, size_t, regmatch_t*);
 
