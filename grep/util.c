@@ -191,3 +191,118 @@ procfile(const char *fn)
   ln.len = 0;
   tail = 0;
   ln.off = -1;
+
+  for (first = true, c = 0; c == 0 || !(lflag || qflag); ) {
+    ln.off += ln.len + 1;
+    if ((ln.dat = grep_fgetln(f, &ln.len)) == NULL || ln.len == 0) {
+      break;
+    }
+    if (ln.len > 0 && ln.dat[ln.len - 1] == line_sep) {
+      --ln.len;
+    }
+
+    /* Return if we need to skip a binary file */
+    if (f->binary && binbehave == BINFILE_SKIP) {
+      grep_close(f);
+      free(ln.file);
+      return (0);
+    }
+    /* Process the file line-by-line */
+    t = procline(&ln, f->binary);
+    c += t;
+
+    /* Count the matches if we have a match limit */
+    if (mflag) {
+      mcount -= t;
+      if (mcount <= 0) {
+        break;
+      }
+    }
+  }
+  if (Bflag > 0) {
+    clearqueue();
+  }
+  grep_close(f);
+
+  if (cflag) {
+    if (!hflag) {
+      print("%s:", ln.file);
+    }
+  }
+  if (lflag && !qflag && c != 0) {
+    printf("%s%c", fn, line_sep);
+  }
+  if (Lflag && !qflag && c == 0) {
+    printf("%s%c", fn, line_sep);
+  }
+  if (c && !cflag && !lflag && !Lflag && binbehave == BINFILE_BIN && f->binary && !qflag) {
+    printf(getstr(8), fn);
+  }
+
+  free(ln.file);
+  free(f);
+  return (c);
+}
+
+#define iswword(x)    (iswalnum((x)) || (x) == L'_')
+
+/*
+ * Processes a line comparing it with the specified patterns. Each pattern
+ * is looped to be compared along with the full string, saving each and every
+ * match, which is necessary to colorize the output and to count the
+ * matches. The matching lines are passed to printline() to display the
+ * appropriate output.
+ */
+static int
+procline(struct str *l, int nottext)
+{
+  regmatch_t matches[MAX_LINE_MATCHES];
+  regmatch_t pmatch;
+  size_t st = 0;
+  unsigned int i;
+  int c = 0, m = 0, r = 0;
+
+  /* Loop to process the whole line */
+  while (st <= l->len) {
+    pmatch.rm_so = st;
+    pmatch.rm_eo = l->len;
+
+    /* Loop to compare with all the patterns */
+    for (i = 0; i < patterns; i++) {
+/*
+ * XXX: grep_search() is a workaround for speed up and should be
+ * removed in the future. See fastgrep.c.
+ */
+      if (fg_pattern[i].pattern) {
+        r = grep_search(&fg_pattern[i], (unsigned char *)l->dat, l->len, &pmatch);
+        r = (r == 0) ? 0 : REG_NOMATCH;
+        st = pmatch.rm_eo;
+      } else {
+        r = regexec(&r_pattern[i], l->dat, 1, &pmatch, eflags);
+        r = (r == 0) ? 0 : REG_NOMATCH;
+        st = pmatch.rm_eo;
+      }
+      if (r == REG_NOMATCH) {
+        continue;
+      }
+      /* Check for full match */
+      if (xflag && (pmatch.rm_so != 0 || (size_t)pmatch.rm_eo != l->len)) {
+        continue;
+      }
+      /* Check for whole word match */
+      if (fg_pattern[i].word && pmatch.rm_so != 0) {
+        wchar_t wbegin, wend;
+
+        wbegin = wend = L' ';
+        if (pmatch.rm_so != 0 && sscanf(&l->dat[pmatch.rm_so -1], "%lc", &wbegin) != 1) {
+          continue;
+        }
+        if ((size_t)pmatch.rm_eo != l->len && sscanf(&l->dat[pmatch.rm_eo], "%lc", &wend) != 1) {
+          continue;
+        }
+        if (iswword(wbegin) || iswword(wend)) {
+          continue;
+        }
+      }
+
+
