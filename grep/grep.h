@@ -69,7 +69,7 @@ typedef struct {
   unsigned char   *pattern;
   int             qsBc[UCHAR_MAX + 1];
   /* flags */
-  bool            bal;
+  bool            bol;
   bool            eol;
   bool            reversed;
   bool            word;
@@ -108,11 +108,11 @@ int   grep_tree(char **argv);
 void  *grep_malloc(size_t nsize);
 void  *grep_calloc(size_t nmemb, size_t size);
 void  *grep_realloc(void *ptr, size_t size);
-void  *grep_strdup(const char *str);
+char  *grep_strdup(const char *str);
 void  grep_printline(struct str *line, int sep);
 
 /* queue.c */
-bool  enqueue(struct str *x);
+void  enqueue(struct str *x);
 void  printqueue(void);
 void  clearqueue(void);
 

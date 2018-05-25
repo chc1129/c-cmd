@@ -18,6 +18,11 @@
 
 #include "grep.h"
 
+#ifndef WITHOUT_NLS
+#include <nl_types.h>
+nl_catd catalog;
+#endif
+
 /*
  * Default message to use when NLS is disabled or no catalogue
  * is found.
@@ -79,9 +84,9 @@ unsigned char line_sep = '\n'; /* 0 for --null-data */
 char     *label;        /* --label */
 const char *color;      /* --color */
 int      grepbehave =GREP_BASIC;        /* -EFGp; type of the regex */
-int      binvehave = BINFILE_BIN;       /* -aIU: handling of binary files */
-int      filevehave = FILE_STDIO;       /* -JZ: normal, gzip or bzip2 file */
-int      devvehave = DEV_READ;          /* -D: handling of devices */
+int      binbehave = BINFILE_BIN;       /* -aIU: handling of binary files */
+int      filebehave = FILE_STDIO;       /* -JZ: normal, gzip or bzip2 file */
+int      devbehave = DEV_READ;          /* -D: handling of devices */
 int      dirbehave = DIR_READ;          /* -dRr: handling of directories */
 int      linkbehave = LINK_READ;        /* -Ops: handling of symlinks */
 

@@ -51,8 +51,8 @@ fastcomp(fastgrep_t *fg, const char *pat)
   fg->len = strlen(pat);
   fg->bol = false;
   fg->eol = false;
-  fg->resarved = false;
-  fg->word = wlag;
+  fg->reversed = false;
+  fg->word = wflag;
 
   /* Remove end-of-line character ('$'). */
   if (fg->len > 0 && pat[fg->len -1] == '$') {
@@ -83,7 +83,7 @@ fastcomp(fastgrep_t *fg, const char *pat)
    */
   fg->pattern = grep_malloc(fg->len + 1);
   memcpy(fg->pattern, pat, fg->len);
-  ft->pattern[fg->len] = '\0';
+  fg->pattern[fg->len] = '\0';
 
   /* Look for ways to cheart...er...avoid the full regex engine. */
   for (i = 0; i < fg->len; i++) {
@@ -91,15 +91,15 @@ fastcomp(fastgrep_t *fg, const char *pat)
     if (fg->pattern[i] == '.') {
       hasDot = i;
       if (i < fg->len /2) {
-        if (firstHaltfDot < 0) {
+        if (firstHalfDot < 0) {
           /* Closest dot to the beginning */
-          firstHaltfDot = i;
+          firstHalfDot = i;
         }
       } else {
         /* Closest dot to the end of the pattern. */
-        lastHaltfDot = i;
-        if (firstLastHaltfDot < 0) {
-          firstLastHaltfDot = i;
+        lastHalfDot = i;
+        if (firstLastHalfDot < 0) {
+          firstLastHalfDot = i;
         }
       }
     } else {
@@ -115,11 +115,11 @@ fastcomp(fastgrep_t *fg, const char *pat)
    * of the dots.
    */
   if ((!(lflag || cflag)) && ((!(fg->bol || fg->eol)) &&
-      ((lastHaltfDot) && ((firstHaltfDot < 0) ||
-      ((fg->len - (lastHaltfDot + 1)) < (size_t)firstHaltfDot)))) &&
+      ((lastHalfDot) && ((firstHalfDot < 0) ||
+      ((fg->len - (lastHalfDot + 1)) < (size_t)firstHalfDot)))) &&
       !oflag && !color) {
         fg->reversed = true;
-        hasDot = fg->len - (firstHaltfDot < 0 ? firstLastHalfDot : firstHalflagDot) - 1;
+        hasDot = fg->len - (firstHalfDot < 0 ? firstLastHalfDot : firstHalfDot) - 1;
         grep_revstr(fg->pattern, fg->len);
   }
 
@@ -193,8 +193,8 @@ grep_search(fastgrep_t *fg, const unsigned char *data, size_t len, regmatch_t *p
       j = fg->eol ? len - fg->len : 0;
       if (!((fg->bol && fg->eol) && (len != fg->len))) {
         if (grep_cmp(fg->pattern, data + j, fg->len) == -1){
-          pattern->rm_so = j;
-          pattern->rm_eo = j + fg->len;
+          pmatch->rm_so = j;
+          pmatch->rm_eo = j + fg->len;
           ret = 0;
         }
       }
@@ -255,7 +255,7 @@ grep_cmp(const unsigned char *pat, const unsigned char *data, size_t len)
     wdata = grep_malloc(size * sizeof(wint_t));
 
     if (mbstowcs(wdata, (const char *)data, size) == ((size_t) - 1)) {
-      return (-1):
+      return (-1);
     }
 
     wpat = grep_malloc(size * sizeof(wint_t));

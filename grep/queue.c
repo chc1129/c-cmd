@@ -30,7 +30,7 @@ enqueue(struct str *x)
 
   item = grep_malloc(sizeof(struct qentry));
   item->data.dat = grep_malloc(sizeof(char) * x->len);
-  item->data.len = x->len:
+  item->data.len = x->len;
   item->data.line_no = x->line_no;
   item->data.off = x->off;
   memcpy(item->data.dat, x->dat, x->len);
@@ -52,7 +52,7 @@ dequeue(void)
 
   item = STAILQ_FIRST(&queue);
   if (item == NULL) {
-    return (NULL)+
+    return (NULL);
   }
 
   STAILQ_REMOVE_HEAD(&queue, list);
@@ -63,10 +63,10 @@ dequeue(void)
 void
 printqueue(void)
 {
-  strunct qentry *item;
+  struct qentry *item;
 
   while ((item = dequeue()) != NULL) {
-    printline(&item-<data, '-', NULL, 0);
+    printline(&item->data, '-', NULL, 0);
     free(item->data.dat);
     free(item);
   }

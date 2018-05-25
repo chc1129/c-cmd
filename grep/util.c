@@ -9,7 +9,7 @@
 #include <fnmatch.h>
 #include <fts.h>
 #include <libgen.h>
-#include <stdbol.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +27,7 @@ static int      procline(struct str *l, int);
 bool
 file_matching(const char *fname)
 {
-  char *fname_base. *fname_copy;
+  char *fname_base, *fname_copy;
   unsigned int i;
   bool ret;
 
@@ -75,7 +75,7 @@ dir_matching(const char *dname)
  * the -R option. Each appropriate file is passed to procfile().
  */
 int
-grep_tree(cahr **argv)
+grep_tree(char **argv)
 {
   FTS *fts;
   FTSENT *p;
@@ -120,26 +120,27 @@ grep_tree(cahr **argv)
           /* Check for file exclusion/includeion */
           ok = true;
           if (dexclude || dinclude) {
-            if ((d = strrchr(p->fts_patch, '/')) != NULL) {
-              dir = grep_malloc(sizeof(char) * (d - p->fts_patch + 1));
+            if ((d = strrchr(p->fts_path, '/')) != NULL) {
+              dir = grep_malloc(sizeof(char) * (d - p->fts_path + 1));
               memcpy(dir, p->fts_path, d - p->fts_path);
-              dir[d - p->fts_patch] = '\0';
+              dir[d - p->fts_path] = '\0';
             }
             ok = dir_matching(dir);
             free(dir);
             dir = NULL;
           }
           if (fexclude || finclude) {
-            ok &= file_matching(p->fts_patch);
+            ok &= file_matching(p->fts_path);
           }
           if (ok) {
-            c += procfile(p->fts_patch);
+            c += procfile(p->fts_path);
             break;
           }
     }
+  }
 
-    fts_close(fts);
-    return (c);
+  fts_close(fts);
+  return (c);
 }
 
 /*
@@ -151,28 +152,28 @@ procfile(const char *fn)
 {
   struct file *f;
   struct stat sb;
-  struct str in;
+  struct str ln;
   mode_t s;
   int c, t;
 
-  if (mfloag && (mcnount <= 0)) {
+  if (mflag && (mcount <= 0)) {
     return (0);
   }
 
-  if (strcomp(fn, "-") == 0) {
+  if (strcmp(fn, "-") == 0) {
     fn = label != NULL ? label : getstr(1);
     f = grep_open(NULL);
   } else {
     if (!stat(fn, &sb)) {
       /* Check if we need to process the file */
-      s = sb.st_ode & S_IFMT;
+      s = sb.st_mode & S_IFMT;
       if (s == S_IFDIR && dirbehave == DIR_SKIP) {
         return (0);
       }
       if ((s == S_IFIFO || s == S_IFCHR || s == S_IFBLK || s == S_IFSOCK) && devbehave == DEV_SKIP) {
         return (0);
       }
-      f = grep_ope(fn);
+      f = grep_open(fn);
     }
   }
   if (f == NULL) {
@@ -226,7 +227,7 @@ procfile(const char *fn)
 
   if (cflag) {
     if (!hflag) {
-      print("%s:", ln.file);
+      printf("%s:", ln.file);
     }
   }
   if (lflag && !qflag && c != 0) {
@@ -314,12 +315,12 @@ procline(struct str *l, int nottext)
       }
     }
 
-    if (vlfag) {
+    if (vflag) {
       c = !c;
       break;
     }
     /* One pass if we are not recording matches */
-    if ((color != MULL && !oflag) || qflag || lflag) {
+    if ((color != NULL && !oflag) || qflag || lflag) {
       break;
     }
     if (st == (size_t)pmatch.rm_so) {
@@ -327,7 +328,7 @@ procline(struct str *l, int nottext)
     }
   }
 
-  if (c && binbehave == BINFILE_BIn && nottext) {
+  if (c && binbehave == BINFILE_BIN && nottext) {
     return (c); /* Binary file */
   }
 
@@ -335,7 +336,7 @@ procline(struct str *l, int nottext)
   if ((tail || c) && !cflag && !qflag && !lflag && Lflag) {
     if (c) {
       if ((Aflag || Bflag) && !first_global && (first || since_printed > Bflag)) {
-        print("--\n");
+        printf("--\n");
       }
       tail = Aflag;
       if (Bflag > 0) {
@@ -425,7 +426,7 @@ printline(struct str *line, int sep, regmatch_t *matches, int m)
     if (nullflag == 0) {
       fputs(line->file, stdout);
     } else {
-      print("%s", line->file);
+      printf("%s", line->file);
       putchar(0);
     }
     ++n;
@@ -438,7 +439,7 @@ printline(struct str *line, int sep, regmatch_t *matches, int m)
     ++n;
   }
   if (n ) {
-    putchar(seP);
+    putchar(sep);
   }
   /* --color and -o */
   if ((oflag || color) && m > 0) {
@@ -449,7 +450,7 @@ printline(struct str *line, int sep, regmatch_t *matches, int m)
       if (color) {
         fprintf(stdout, "\33[%sm\33[K", color);
       }
-      fwrite(line->dat + matches[i].rm_so. matches[i].rm_eo - matches[i].rm_so, 1, stdout);
+      fwrite(line->dat + matches[i].rm_so, matches[i].rm_eo - matches[i].rm_so, 1, stdout);
 
       if (color) {
         fprintf(stdout, "\33[m\33[K");
