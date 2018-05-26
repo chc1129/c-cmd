@@ -113,6 +113,7 @@ static inline const char      *init_color(const char *);
 int     tail;     /* lines left to print */
 bool    notfound; /* file not found */
 
+extern char   *__progname;
 
 /*
  * Prints usage information and returns 2.
@@ -120,7 +121,7 @@ bool    notfound; /* file not found */
 static void
 usage(void)
 {
-    fprintf(stderr, getstr(4), getprogname());
+    fprintf(stderr, getstr(4), __progname);
     fprintf(stderr, "%s", getstr(5));
     fprintf(stderr, "%s", getstr(6));
     fprintf(stderr, "%s", getstr(7));
@@ -296,7 +297,7 @@ main(int argc, char *argv[])
   /* Check what is the program name of the binary. In this
      way ew can have all the functionalities in one binary
      without the need of scriptin and using ugly hacks. */
-  switch (getprogname()) {
+  switch (__progname[0]) {
   case 'e':
     grepbehave = GREP_EXTENDED;
     break;
@@ -308,7 +309,7 @@ main(int argc, char *argv[])
     break;
   case 'z':
     filebehave = FILE_GZIP;
-    switch(getprogname()) {
+    switch(__progname[0]) {
     case 'e':
       grepbehave = GREP_EXTENDED;
       break;
@@ -520,8 +521,7 @@ main(int argc, char *argv[])
       /* noop, compatibility */
       break;
     case 'V':
-//      printf(getstr(9), getprogname(), VERSION);
-      printf(getstr(9), getprogname(), "");
+      printf(getstr(9), __progname[0], "");
       exit(0);
     case 'v':
       vflag = true;

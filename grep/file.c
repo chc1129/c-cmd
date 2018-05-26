@@ -39,21 +39,21 @@ static inline int
 grep_refill(struct file *f)
 {
   ssize_t nr;
-  int bzrr;
+  int bzerr;
 
   bufpos = buffer;
   bufrem = 0;
 
   if (filebehave == FILE_GZIP) {
-    nr = gzread(gzbufdesc, buffer, MAXBUFSIZE);
+    nr = gzread(gzbufdesc, buffer, MAXBUFSIZ);
   } else if (filebehave == FILE_BZIP && bzbufdesc != NULL) {
-    nr = BZ2_bzRead(&bzerr, bzbufdecs, buffer, MAXBUFSIZ);
+    nr = BZ2_bzRead(&bzerr, bzbufdesc, buffer, MAXBUFSIZ);
     switch (bzerr) {
     case BZ_OK:
     case BZ_STREAM_END:
       /* No problem, nr will be okay */
       break;
-    case BZ_DATA_ERROR_MGIC:
+    case BZ_DATA_ERROR_MAGIC:
       /*
        * As opposed to gzread(), which simply returns the
        * plain file data, if is not in the correct
@@ -67,14 +67,14 @@ grep_refill(struct file *f)
       if (lseek(f->fd, 0, SEEK_SET) == -1) {
         return (-1);
       }
-      nr = read(f->fd, buffer, MAXBUFSIZE);
+      nr = read(f->fd, buffer, MAXBUFSIZ);
       break;
     default:
       /* Make sure we exit with an error */
       nr = -1;
     }
   } else {
-    nr = read(f->fd, buffer, MAXBUFSIZE);
+    nr = read(f->fd, buffer, MAXBUFSIZ);
   }
 
   if (nr < 0) {
@@ -107,7 +107,7 @@ grep_fgetln(struct file *f, size_t *lenp)
   ptrdiff_t diff;
 
   /* Fill the buffer, if necessary */
-  if (bufrem == 0 && grep_refill(F) != 0) {
+  if (bufrem == 0 && grep_refill(f) != 0) {
     goto error;
   }
 
@@ -200,7 +200,7 @@ error:
  * Opens a file for processing.
  */
 struct file *
-grep_open(const cahr *path)
+grep_open(const char *path)
 {
   struct file *f;
 
