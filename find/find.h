@@ -60,4 +60,42 @@ typedef struct _plandata {
                 FILE *_fprint_file;               /* file stream for -fprint */
         } p_un;
 } PLAN;
+#define a_data          p_un._a_data
+#define c_data          p_un._c_data
+#define i_data          p_un._i_data
+#define f_data          p_un._f_data
+#define g_data          p_un._g_data
+#define l_data          p_un._l_data
+#define m_data          p_un._m_data
+#define mt_data         p_un._mt_data
+#define o_data          p_un._o_data
+#define p_data          p_un._p_data
+#define t_data          p_un._t_data
+#define ts_data         p_un._ts_data
+#define u_data          p_un._u_data
+#define e_argv          p_un.ex._e_argv
+#define e_orig          p_un.ex._e_orig
+#define e_len           p_un.ex._e_len
+#define ep_p            p_un.ex._ep_p
+#define ep_bbp          p_un.ex._ep_bbp
+#define ep_ebp          p_un.ex._ep_ebp
+#define ep_bxp          p_un.ex._ep_bxp
+#define ep_cnt          p_un.ex._ep_cnt
+#define ep_maxargs      p_un.ex._ep_maxargs
+#define ep_nline        p_un.ex._ep_nline
+#define ep_narg         p_un.ex._ep_narg
+#define ep_rval         p_un.ex._ep_rval
+#define exit_val        p_un._exit_val
+#define max_data        p_un._max_data
+#define min_data        p_un._min_data
+#define regexp_dat      p_un._regexp_data
+#define fprint_file     p_un._fprint_file
 
+typedef struct _option {
+  const char *name;                       /* option name */
+  enum ntype token;                       /* token type */
+  PLAN *(*create)(char ***, int, char *); /* create function */
+  int arg;                                /* function needs arg */
+} OPTION;
+
+#include "extern.h"
