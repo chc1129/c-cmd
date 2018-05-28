@@ -376,4 +376,91 @@ c_csince(char ***argvp, int isok, char *opt)
   return (new);
 }
 
+/*
+ * -ctime n functions --
+ *
+ *      True if the difference between the last change of file
+ *      status information and the current time is n 24 hour periods.
+ */
+int
+f_ctime(PLAN *plan, FTSENT *entry)
+{
+  COMPARE((now - entry->fts_statp->st_ctime + SECSPERADAY - 1) / SECSPERDAY, plan->t_data);
+}
+
+PLAN *
+c_ctime(char ***argvp, int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  new = palloc(N_CTIME, f_ctime);
+  new->t_data = find_parsenum(new, opt, arg, NULL);
+  TIME_CORRECT(new, N_CTIME);
+  return (new);
+}
+
+/*
+ * -delete functions --
+ *
+ *      Always true. Makes its best shot and continues on regardless.
+ */
+int
+f_delete(PLAN *plan __unused, FTSENT *entry)
+{
+  /* ignore these from fts */
+  if (strcmp(entry->fts_accpath, ".") == 0|| strcmp(entry->fts_accpath, "..") == 0) {
+    return 1;
+  }
+
+  /* sanity check */
+  if (isdepth == 0 ||                     /* depth off */
+      (ftsoptions & FTS_NOSTAT) ||        /* not stat()ing */
+      !(ftsoptions & FTS_PHYSICAL) ||     /* physical off */
+      (ftsoptions & FTS_LOGICAL)) {       /* or finally, logical on */
+        err(1, "-delete: insecure options got turned on");
+  }
+
+  /* Potentially unsafe - do not accept relative paths whatsoever */
+  if (entry->fts_level > 0 && strchr(entry->fts_accepth, '/') != NULL) {
+    err(1, "delete: %s: relative path potentially not safe", entry->fts_accpath);
+  }
+
+  /* Turn off user immutable bits if running as root */
+  if ((entry->fts_statp->st_flags & (UF_APPEND|UF_IMMUTABLE)) &&
+      !(entry->fts_statp->st_flags & (SF_APPEND|SF_IMMUTABLE)) &&
+      geteuid() == 0) {
+        chflags(entry->fts_accpath, entry->fts_statp->st_flags &= ~(UF_APPEND|UF_IMMUTABLE));
+  }
+
+  /* rmdir directories, unlink everything else */
+  if (S_ISDIR(entry->fts_statp->st_mode)) {
+    if (rmdir(entry->fts_accpath) < 0 && errno != ENOTEMPTY) {
+      warn("-delete: rmdir(%s)", entry-fts_path);
+    }
+  } else {
+    if (unlink(entry->fts_accpath) < 0) {
+      warn("-delete: unlink(%s)", entry->fts_path);
+    }
+  }
+
+  /* "succeed" */
+  return 1;
+}
+
+PLAN *
+c_delete(char ***argvp __unused, int isok, char *opt)
+{
+  ftsoptions &= ~FTS_NOSTAT;        /* no optimize */
+  ftsoptions |= FTS_PHYSICAL;       /* disable -follow */
+  ftsoptions &= ~FTS_LOGICAL;       /* disable -follow */
+  isoutput = 1;                     /* possible output */
+  isdepth = 1;                      /* -depth implied */
+
+  return palloc(N_DELETE, f_delete);
+}
+
 
