@@ -567,4 +567,179 @@ f_exec(PLAN *plan, FTSENT *entry)
       if (plan->ep_narg == plan->ep_maxargs) {
         run_f_exec(plan);
       }
+    } else {
+      /*
+       * Without sufficient space to copy in the next
+       * argument, run the command to empty out the
+       * buffer before re-attepting the copy.
+       */
+      run_f_exec(plan);
+      if ((plan->ep_p + 1 < plan->ep_ebp)) {
+        plan->ep_bxp[plan->ep_narg++] = strcpy(plan->ep_p, entry->fts_path);
+        plan->ep_p += l + 1;
+      } else {
+        err(1, "insufficient space for argument");
+      }
+    }
+    return (1);
+  } else {
+    for (cnt = 0; plan->e_argv[cnt]; ++cnt) {
+      if (plan->e_len[cnt]) {
+        brace_subst(plan->e_orig[cnt],
+            &plan->e_argv[cnt],
+            entry->fts_path,
+            &plan->e_len[cnt]);
+      }
+      if (plan->flags & F_NEEDOK && !queryuser(plan->e_argv)) {
+        return (0);
+      }
+
+      /* Don't mix output of command with find output. */
+      fflush(stdout);
+      fflush(stderr);
+
+      switch (pid = vfork()) {
+      case -1:
+        err(1, "vfork");
+        /* NOTREACHED */
+      case 0:
+        if (fchdir(dotfd)) {
+          warn("chdir");
+          _exit(1);
+        }
+        execvp(plan->e_argv[0], plan->e_argv);
+        warn("%s", plan->e_argv[0]);
+        _exit(1);
+      }
+      pid = waitpid(pid, &status, 0);
+      return (pid != 1 && WOFEXITED(status) && !WEXITSTATUS(status));
+    }
+  }
+}
+
+static void
+run_f_exec(PLAN *plan)
+{
+  pid_t pid;
+  int rval, status;
+
+  /* Ensure arg list is null terminated. */
+  plan->ep_bxp[plan->ep_narg] = NULL;
+
+  /* Don't mix output of command with find outpout. */
+  fflush(stdout);
+  fflush(stderr);
+
+  switch (pid = vfork()) {
+  case -1:
+    err(1, "vfork");
+    /* NOTREACHED */
+  case 0:
+    if (fchdir(dotfd)) {
+      warn("chdir");
+      _exit(1);
+    }
+    execvp(plan->e_argv[0], plan->e_argv);
+    warn("%s", plan->e_argv[0]);
+    _exit(1);
+  }
+
+  /* Clear out the argument list. */
+  plan->ep_narg = 0;
+  plan->ep_bxp[plan->ep_narg] = NULL;
+  /* As well as the argument buffer. */
+  plan->ep_p = plan->ep_bbp;
+  *plan->ep_p = '\0';
+
+  pid = waitpid(pid, &status, 0);
+  if (WIFEXITED(status)) {
+    rval = WEXITSTATUS(status);
+  } else {
+    rval = -1;
+  }
+
+  /*
+   * If we have a non-zero exit status, preserve it so find(1) can
+   * later exit with it.
+   */
+  if (rval) {
+    plan->ep_rval = rval;
+  }
+}
+
+/*
+ * c_exec --
+ *      build three parallel arrays, one with pointers to the strings passed
+ *      on the comand line, one with (possibly duplicated) pointers to the
+ *      argv array, and one with integer values that are lengths of the
+ *      strings, but also flags meaning that the string hax to be messaged.
+ *
+ *      If -exec ... {} +, use only the first array, but make it large
+ *      enough to hold 5000 args (cf. src/usr.bin/xargs/xargs.c for a
+ *      discussion), and then allocate ARG_MAX - 4K of space for args.
+ */
+PLAN *
+c_exec(char ***argvp, int isok, char *opt)
+{
+  PLAN *new;                        /* node returned */
+  size_t cnt;
+  int brace, lastbrace;
+  char **argv, **ap, *p;
+
+  isoutput = 1;
+
+  new = palloc(N_EXEC, f_exec);
+  if (isok) {
+    new->flags |= F_NEEDOK;
+  }
+
+  /*
+   * Terminate if we encounter an arg exactly equal to ";", or an
+   * arg exactly equal to "+" following an arg exactly equal to
+   * "{}".
+   */
+  for (ap = argv = *argvp, brace = 0;; ++ap) {
+    if (!*ap) {
+      err(1, "%s: no terminating \";\" or \"+\"", opt);
+    }
+    lastbrace = brace;
+    brace = 0;
+    if (strcmp(*ap, "{}") == 0) {
+      brace = 1;
+    }
+    if (strcmp(*ap, ";") == 0) {
+      break;
+    }
+    if (strcmp(*ap, "+") == 0 && lastbrace) {
+      new->flags |= F_PLUSSET;
+      break;
+    }
+  }
+
+  /*
+   * POSIX says -ok ... {} + "need not be supported." and it does
+   * not make much sense anyway.
+   */
+  if (new->flags & F_NEEDOK && new->flags & F_PLUSSET) {
+    err(1, "%s: terminating \"+\" not permitted.", opt);
+  }
+
+  if (new->flags & F_PLUSSET) {
+    size_t c, bufsize;
+
+    cnt = ap - *argvp - 1;              /* units are words */
+    new->ep_maxargs = 5000;
+    new->e_argv = emalloc((cnt + new->qp_maxargs) * sizeof(*new->e_argv));
+
+    /* We start stuffing arguments after the user's last one. */
+    new->ep_bxp = &new->e_argv[cnt];
+    new->ep_narg = 0;
+
+    /*
+     * Count up the space of the user's arguments, and
+     * subtract that from what we allocate.
+     */
+#define MAXARG (ARG_MAX - 4 * 1024)
+    for (argv = *argvp, c = 0, cnt = 0;
+        argv < ap;
 
