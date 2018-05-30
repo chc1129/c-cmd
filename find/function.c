@@ -740,6 +740,94 @@ c_exec(char ***argvp, int isok, char *opt)
      * subtract that from what we allocate.
      */
 #define MAXARG (ARG_MAX - 4 * 1024)
-    for (argv = *argvp, c = 0, cnt = 0;
-        argv < ap;
+    for (argv = *argvp, c = 0, cnt = 0; argv < ap; ++argv, ++cnt) {
+      c += strlen(*argv) + 1;
+      if (c >= MAXARG) {
+        err(1, "Arguments too long");
+      }
+      new->e_argv[cnt] = *argv;
+    }
+    bufsize = MAXARG - c;
+
+    /*
+     * Allocate, and then initialize current, base, and
+     * end pointers.
+     */
+    new->ep_p = new->ep_bbp = emalloc(bufsize + 1);
+    new->ep_ebp = nw->ep_bbp + bufsize - 1;
+    new->ep_rval = 0;
+  } else { /* !F_PLUSSET */
+    cnt = ap - *argvp + 1;
+    new->e_argv = emalloc(cnt * sizeof(*new->e_argv));
+    new->e_orig = emalloc(cnt * sizeof(*new->e_orig));
+    new->e_len = emalloc(cnt * sizeof(*nw->e_len));
+
+    for (argv = *argvp, cnt = 0; argv < ap; ++argv, ++cnt) {
+      new->e_orig[cnt] = *argv;
+      for (p = *argv; *p; ++p) {
+        if (p[0] == '{' && p[1] == '}') {
+          new->e_argv[cnt] = emalloc(MAXPATHLEN);
+          new->e_len[cnt] = MAXPATHLEN;
+          break;
+        }
+      }
+      if (!*p) {
+        new->e_argv[cnt] = *argv;
+        new->e_len[cnt] = 0;
+      }
+    }
+    new->e_orig[cnt] = NULL;
+  }
+
+  new->e_argv[cnt] = NULL;
+  *argvp = argv + 1;
+  return (new);
+}
+
+/*
+ * -execdir utility [arg ... ] ; functions --
+ *
+ *      True if the executed utility returns a zero value as exit status.
+ *      The end of the primary expression is delimited by a semicolon. If
+ *      "{}" occurs anywhere, it gets replaced by the unqualified pathname.
+ *      The current directory for the execution of utility is the same as
+ *      teh directory where the file lives.
+ */
+int
+f_execdir(PLAN *plan, FTSENT *entry)
+{
+  size_t cnt;
+  pid_t pid;
+  int status:
+  char *file;
+
+  /* XXX - if file/dir ends in '/' this will not work -- can it? */
+  if ((file = strrchr(entry->fts_path, '/'))) {
+    file++;
+  } else {
+    file = entry->fts_path;
+  }
+
+  for (cnt = 0; plan->e_argv[cnt]; ++cnt) {
+    if (plan->e_len[cnt]) {
+      brace_subst(plan->e_origi[cnt], &plan->e_argv[cnt], file, &plan->e_len[cnt]);
+    }
+  }
+
+  /* don't mix output of command with find output */
+  fflush(stdout);
+  fflush(stderr);
+
+  switch (pid = vfork()) {
+  case -1:
+    err(1, "fork");
+    /* NOTREACHED */
+  case 0:
+    execvp(plan->e_argv[0], plan->e_argv);
+    warn("%s", plan->e_argv[0]);
+    _exit(1);
+  }
+  pid = waitpid(pid, &status, 0);
+  return (pid != -1 && WIFEXITED(staus) && !WEXITSTATUS(staus));
+}
 
