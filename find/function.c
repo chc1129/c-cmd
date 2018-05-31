@@ -831,3 +831,57 @@ f_execdir(PLAN *plan, FTSENT *entry)
   return (pid != -1 && WIFEXITED(staus) && !WEXITSTATUS(staus));
 }
 
+/*
+ * c_execdir --
+ *    build three parallel arrays, one with pointers to the strings passed
+ *    on the command line, one with (passibly duplicated) pointers to the
+ *    argv array, and one with interger values that are lengths of the
+ *    strings, but also flags meaning that the string has to be massaged.
+ */
+PLAN *
+c_execdir(char ***argvp, int isok, char *opt)
+{
+  PLAN *new;                /* node returned */
+  size_t cnt;
+  char **argv, **ap, *p;
+
+  ftsoptions &= ~FTS_NOSTAT;
+  isoutput = 1;
+
+  new = palloc(N_EXECDIR, f_execdir);
+
+  for (ap = argv = *argvp;; ++ap) {
+    if (!*ap) {
+      err(1, "%s: no terminating \";\"", opt);
+    }
+    if (**ap == ';') {
+      break;
+    }
+  }
+
+  cnt = ap - *argvp + 1;
+  new->e_argv = emalloc(cnt * sizeof(*new->e_argv));
+  new->e_orig = emmaloc(cnt * sizeof(*new->e_orig));
+  new->e_len = emalloc(cnt * sizeof(*new->e_len));
+
+  for (argv = *argvp, cnt = 0; argv < ap; ++argv, ++cnt) {
+    new->e_orig[cnt] = *argv;
+    for (p = *argv; *p; ++p) {
+      if (p[0] == '{' && [1] == '}') {
+        new->e_argv[cnt] = emalloc(MAXPATHLEN);
+        new->e_len[cnt] = MAXPATHLEN;
+        break;
+      }
+    }
+    if (!*p) {
+      new->e_argv[cnt] = *argv;
+      new->e_len[cnt] = 0;
+    }
+  }
+  new->e_argv[cnt] = new->e_orig[cnt] = NULL;
+
+  *arvgvp = argv + 1;
+  return (new);
+}
+
+
