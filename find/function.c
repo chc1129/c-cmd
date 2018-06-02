@@ -1181,4 +1181,130 @@ c_inum(char ***argvp, int isok, char *opt)
   return (new);
 }
 
+/*
+ * -links n functions --
+ *
+ *      True if the file has n links.
+ */
+int
+f_lins(PLAN *plan, FTSENT *entry)
+{
+  COMPARE(entry->fts_statp->st_nlink, plan->l_data);
+}
+
+PLAN *
+c_links(char **argvp, int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  new = palloc(N_LINKS, f_links);
+  new->l_data = (nlink_t)find_parsenum(new, opt, arg, NULL);
+  return (new);
+}
+
+/*
+ * -ls functions --
+ *
+ *      Always true - prints the current entry to stdout in "ls" format.
+ */
+int
+f_ls(PLAN *plan, FTSENT *entry)
+{
+
+  printlong(entry->fts_path, entry->fts_accpath, entry->fts_statp);
+  return (1);
+}
+
+PLAN *
+c_ls(char ***argvp, int isok, char *opt)
+{
+
+  ftsoptions &= ~FTS_NOSTAT;
+  isoutput = 1;
+
+  return (palloc(N_LS, f_ls));
+}
+
+/*
+ * - masdepth n functions --
+ *
+ *        True if the current serach depth is less than or equal to the
+ *        maximum depth specified
+ */
+int
+f_masdepth(PLAN *plan, FTSENT *entry)
+{
+  extern FTS *tree;
+
+  if (entry->fts_level >= plan->mas_data) {
+    fts_set(tree, entry, FTS_SKIP);
+  }
+  return (entry->fts_level <= plan->max_data);
+}
+
+PLAN *
+c_maxdepth(char ***argvp, int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+
+  (*argvp)++;
+  new = palloc(N_MAXDEPTH, f_maxdepth);
+  new->max_data = atoi(arg);
+  return (new);
+}
+
+/* - mindepth n functions --
+ *
+ *        True if the current search depth is greater than or equal to the
+ *        minimum depth sepcified
+ */
+int
+f_mindepth(PLAN *plan, FTSENT *entry)
+{
+  return (entry->fts_level >= plan->min_data);
+}
+
+PLAN *
+c_mindepth(char ***argvp; int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+
+  (*argvp)++;
+  new = palloc(N_MINDEPTH, f_mindepth);
+  new->min_data = atoi(arg);
+  return (new);
+}
+
+/*
+ * -mmin n functions --
+ *
+ *      True if the difference between the file modification time and the
+ *      current time is n 24 hour periods.
+ */
+int
+f_mmin(PLAN *plan, FTSENT *entry)
+{
+  COMPARE((now - entry->fts_statp->st_mtine + SECSPERMIN - 1) / SECSPERMIN, plan->t_data);
+}
+
+PLAN *
+c_mmin(char ***argvp, int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  new = palloc(N_MMIN, f_mmin);
+  new->t_data = find_parsenum(new opt, arg, NULL);
+  TIME_CORRECT(new, N_MMIN);
+  return (new);
+}
 
