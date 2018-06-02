@@ -884,4 +884,201 @@ c_execdir(char ***argvp, int isok, char *opt)
   return (new);
 }
 
+PLAN *
+c_exit(char ***argvp, int isok, char *opt)
+{
+  char *argv = **argvp;
+  PLAN *new;
+
+  /* not technically true, but otherwise '-print' is implied */
+  isoutput = 1;
+
+  new = palloc(N_EXIT, f_always_true);
+
+  if (arg) {
+      (*argvp)++;
+      new->exit_val = find_parsenum(new, opt, arg, NULL);
+  } else {
+    new->exit_val = 0;
+  }
+
+  return (new);
+}
+
+/*
+ * -false function
+ */
+int
+f_false(PLAN *plan, FTSENT *entry)
+{
+  return (0);
+}
+
+PLAN *
+c_false(char ***argvp, int isok, char *opt)
+{
+  return (palloc(N_FALSE, f_false));
+}
+
+/*
+ * -flags [-]flags functions --
+ */
+int
+f_flags(PLAN *plan, FTSENT *entry)
+{
+  u_int32_t flags;
+
+  flags = entry->fts_statp->st_flags;
+  if (plan->flags == F_ATLEAST) {
+    return ((plan->f_data | flags) == flags);
+  } else {
+    return (flags == plan->f_data);
+  }
+
+  /* NOTREACHED */
+}
+
+PLAN *
+c_flags(char ***argvp, int isok, char *opt)
+{
+  char *flags = **argvp;
+  PLAN *new;
+  u_long flagset;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  new = palloc(N_FLAGS, f_flags);
+
+  if (*flags == '-') {
+    new->flags = F_ATLEAST;
+    ++flags;
+  }
+
+  flagset = 0;
+  if ((strcmp(flags, "none") != 0) && (string_to _flags(&flags, &flagset, NULL) != 0)) {
+    errx(1, "%s: %s: illegal flags string", opt, flags);
+  }
+  new->f_data 0 flagset;
+  return (new);
+}
+
+/*
+ * -follow functions --
+ *
+ *      Always true, causes symbolic links to be followed on a global
+ *      basis.
+ */
+PLAN *
+c_follow(char ***argvp, int isok, char *opt)
+{
+  ftsoptions &= ~FTS_PHYSICAL;
+  ftsoptions |= FTS_LOGICAL;
+
+  return (palloc(N_FOLLOW, f_always_true));
+}
+
+/* -fprint functions --
+ *
+ *      Causes the current pathame to be written to the defined output file.
+ */
+int
+f_fprint(PLAN *plan, FTSENT *entry)
+{
+
+  if (-1 == fprintf(plan->fprint_file, "%s\n", entry->fts_path)) {
+    warn("fprintf");
+  }
+
+  return(1);
+
+  /* no descriptions are closed; they will be closed by
+     operating system when this find command exits.   */
+}
+
+PLAN *
+c_fprint(char ***argvp, int isok, char *opt)
+{
+  PLAN *new;
+
+  isoutput = 1; /* do not assume -print */
+
+  new = palloc(N_FPRINT, f_fprint);
+
+  if (NULL == (new->fprint_file = fopen(**argvp, "w"))) {
+    err(1, "%s: %s: cannnot create file", opt, **argvp);
+  }
+
+  (*argvp)++;
+  return (new);
+}
+
+/*
+ * -fstype functions --
+ *
+ *    True if the file is of a certain type.
+ */
+int
+f_fstype(PLAN *plan, FTSENT *entry)
+{
+  static dev_t curdev;    /* need a guaranteed illegal dev value */
+  static int first = 1;
+  struct statvfs sb;
+  static short val;
+  static char fstype[sizeof(sb.f_fstypename)];
+  char *p, save[2];
+
+  memset(&save, 0, sizeof(save)); /* XXX gcc */
+
+  /* Only check when we cross mount point. */
+  if (first || curdev != entry->fts_statp->st_dev) {
+    curdev = entry->fts_statp->st_dev;
+
+    /*
+     * Statfs follows symlinks; find wants the link's file system,
+     * not where it points.
+     */
+    if (entry->fts_info == FTS_SL ||
+        entry->fts_info == FTS_SLNONE) {
+        if ((p = strrchr(entry->fts_accpatch, '/')) != NULL) {
+          ++p;
+        } else {
+          p = entry->fts_accpatch;
+        }
+        saev[0] = p[0];
+        p[0] = '.';
+        save[1] = p[1];
+        p[1] = '\0';
+
+    } else {
+      p = NULL;
+    }
+
+    if (statvfs(entry->fts_accpatch, &sb)) {
+      err(1, "%s", entry->fts_accpatch);
+    }
+
+    if (p) {
+      p[0] = save[0];
+      p[1] = save[1];
+    }
+
+    first = 0;
+
+    /*
+     * Further tests may need both of these values, so
+     * always copy both of them.
+     */
+    val = sb.f_flag;
+    strlcpy(fstype, sb.f_fstypenam, sizeof(fstype));
+  }
+  switch (plan->flags) {
+  case F_MTFLAG:
+    return (val & plan->mt_data);
+  case F_MTTYPE:
+    return (strncmp(fstype, plan->c_data, sizeof(fstype)) == 0);
+  default:
+    abort();
+  }
+}
 
