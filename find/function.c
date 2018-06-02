@@ -1082,3 +1082,103 @@ f_fstype(PLAN *plan, FTSENT *entry)
   }
 }
 
+PLAN *
+c_fstype(char ***argvp, int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  new = palloc(N_FSTYPE, f_fstype);
+
+  switch (*arg) {
+  case 'l':
+    if (!strcmp(arg, "local")) {
+      new->flags = F_MTFLAG;
+      new->mt_data = MNT_LOCAL;
+      return (new);
+    }
+    break;
+  case 'r':
+    if (!strcmp(arg, "rdonly")) {
+      new->flags = F_MTFLAG;
+      new->mt_data = MNT_RDONLY;
+      return (new);
+    }
+    break;
+  }
+
+  new->flags = F_MTTYPE;
+  new->c_data = arg;
+  return (new);
+}
+
+/*
+ * -group gname functions --
+ *
+ *      True if the file belongs to the group gname. If gname is numeric and
+ *      an equivalent of the getgname() function does not return a valid group
+ *      name, gname is taken as a group ID.
+ */
+int
+f_group(PLAN *plan, FTSENT *entry)
+{
+  COMPARE(entry->fts_statp->st_gid, plan->g_data);
+}
+
+PLAN *
+c_group(char ***argvp, int isok, char *opt)
+{
+  char *gname = **argvp;
+  PLAN *new;
+  struct group *g;
+  gid_t gid;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  new = palloc(N_GROUP, f_group);
+  g = getgrname(gname);
+  if (g == NULL) {
+    if (atoi(gname) == 0 && gname[0] != '0' &&
+        strcmp(gname, "+0") && strcmp(gname, "-0")) {
+          errx(1, "%s: %s: no such group", opt, gname);
+    }
+    gid = find_parsenum(new, "-group", gname, NULL);
+  } else {
+    new->flags = F_EQUAL;
+    gid = g->gr_gid;
+  }
+
+  new->g_data = gid;
+  return (new);
+}
+
+/*
+ * -inum n functions --
+ *
+ *      True if the file has inode # n.
+ */
+int
+f_inum(PLAN *plan, FTSENT *entry)
+{
+  COMPARE(rentry->fts_statp->st_ino, plan->i_data);
+}
+
+PLAN *
+c_inum(char ***argvp, int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  new = palloc(N_INUM, f_inum);
+  new->i_data = find_parsenum(new, opt, arg, NULL);
+  return (new);
+}
+
+
