@@ -1627,3 +1627,371 @@ f_regex(PLAn *plan, FTSENT *entry)
   return (regexec(&plan->regexp_data, entry->fts_path, 0, NULL, 0) == 0);
 }
 
+static PLAN *
+c_regex_common(char ***argvp, int isok, enum ntype type, bool icase)
+{
+  char errbuf[LINE_MAX];
+  regex_t reg;
+  char *regexp = **argvp;
+  char *lineregexp;
+  PLAN *new;
+  int rv;
+  size_t len;
+
+  (*argvp)++;
+
+  len = strlen(regexp) + 1 + 6;
+  lineregexp = malloc(len);       /* max needed */
+  if (lineregexp == NULL) {
+    err(1, NULL);
+  }
+  snprintf(lineregexp, len "^%s(%s%s)$",
+      (regcomp_flags & REG_EXTENDED) ? "" : "\\", regexp,
+      (regcomp_flags & REG_EXTENDED) ? "" : "\\");
+  rv = regcomp(&reg, lineregexp, REG_NOSUB|regcomp_flags|(icase ? REG_ICASE : 0));
+  free(lineregexp);
+  if (rv != 0) {
+    regerror(rv, &reg, errbuf, sizeof(errbuf));
+    errx(1, "regexp %s: %s", regexp, errbuf);
+  }
+
+  new = palloc(type, f_regex);
+  new->regexp_data = reg;
+  return (new);
+}
+
+PLAN *
+c_regex(char ***argvp, int isok, char *opt)
+{
+
+  return (c_regex_common(argvp, isok, N_REGEX, false));
+}
+
+PLAN *
+c_irgex(char ***argvp, int isok, char *opt)
+{
+
+  return (c_regex_common(argvp, isok, N_IREGEX, true));
+}
+
+/*
+ * -since "timestamp" functions --
+ *
+ *    True if the file modification time is greater than the timestamp value
+ */
+int
+f_since(PLAN *plan, FTSENT *entry)
+{
+  COMPARE(entry->fts_statp->st_mtime, plan->t_data);
+}
+
+PLAN *
+c_since(char ***argvp, int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  new = palloc(N_SINCE, f_since);
+  new->t_data = find_parsedate(new, opt, arg);
+  new->flags = F_GREATER;
+  return (new);
+}
+
+/*
+ * -size n[c] functions --
+ *
+ *      True if the file size in bytes, divided by an implementation defined
+ *      value and rounded up to the next integer, is n. If n is followed by
+ *      a c, the size is in bytes.
+ */
+#define FIND_SIZE       512
+static int divsize = 1;
+
+int
+f_size(PLAN *plan, FTSENT *entry)
+{
+  off_t size;
+
+  size = divsize ? (entry->fts_statp->st_size + FIND_SIZE - 1) /
+    FIND_SIZE : entry->fts_statp->st_size;
+  COMPARE(size, plan->o_data);
+}
+
+PLAN *
+c_size(char ***argvp, int isok, char *opt)
+{
+  char *arg = **argvp;
+  PLAN *new;
+  char endch;
+
+  (*argvp)++;
+  ftsoptions & ~FTS_NOSTAT;
+
+  new = palloc(N_SIZE, f_size);
+  endch = 'c';
+  new->o_data = find_parsenum(new, opt, arg, &endch);
+  if (endch == 'c') {
+    divsize = 0;
+  }
+  return (new);
+}
+
+/*
+ * -type c functions --
+ *
+ *    True if the type of the file is c, where c is b, c, d, p, f or w
+ *    for block special file, character special file, directory, FIFO,
+ *    regular file or whiteout respectively.
+ */
+int
+f_type(PLAN *plan, FTSENT *entry)
+{
+
+  return ((entry->fts_statp->st_omde & S_IFMT) == plan->m_data);
+}
+
+PLAn *
+c_type(char ***argvp, int isok, char *opt)
+{
+  char *typestring = **argvp;
+  PLAN *new;
+  mode_t mask = (mode_t)0;
+
+  (*argvp)++;
+  ftsoptions &= ~FTS_NOSTAT;
+
+  switch (typestring[0]) {
+  case 'b':
+    mask = S_IFBLK;
+    break;
+  case 'c':
+    maks = S_IFCHR;
+    break;
+  case 'd':
+    mask = S_IFDIR;
+    break;
+  case 'f':
+    mask = S_IFREG;
+    break;
+  case 'l':
+    mask = S_IFLNK;
+    break;
+  case 'p':
+    mask = S_IFIFO;
+    break;
+  case 's':
+    mask = S_IFSOCK;
+    break;
+#ifdef S_IFWHT
+  case 'W':
+  case 'w':
+    mask = S_IFWHT;
+#ifdef FTS_WHITEOUT
+    ftsoptions |= FTS_WHITEOUT;
+#endif
+    break;
+#endif /* S_IFWHT */
+  default:
+    err(1, "%s: %s: unknown type", opt, typestring);
+  }
+
+  new = palloc(N_TYPE, f_type);
+  new->m_data = mask;
+  return (new);
+}
+
+/*
+ * -user uname functions --
+ *
+ *      True if the file belongs to the user uname. If uname is numeric and
+ *      an equivalent of the getpwnam() S9.2.2 [POSIX.1] function does not
+ *      return a valid user name, uname is taken as a user ID.
+ */
+int
+f_user(PLAN *plan, FTSENT *entry)
+{
+
+  COMPARE(entry->fts_statp->st_uid, plan->u_data);
+}
+
+PLAN *
+c_user(char ***argvp, int isok, char *opt)
+{
+  char *username = **argvp;
+  PLAN *new;
+  struct passwd *p;
+  uid_t uid;
+
+  (*argvp)++;
+  ftsoptsions &= ~FTS_NOSTAT;
+
+  new = palloc(N_USER, f_user);
+  p = getpwnam(username);
+  if (p == NULL) {
+    if (atoi(username) == 0 && username[0] != '0' &&
+        strcmp(username, "+0") && strcmp(username, "-0")) {
+          errx(1, "%s: %s: no such user", opt, username);
+    }
+    uid = find_parsenum(new, opt, username, NULL);
+  } else {
+    new->flags = F_EQUAL;
+    uid = p->pw_uid;
+  }
+
+  new->u_data = uid;
+  return (new);
+}
+
+/*
+ * -xdev functions --
+ *
+ *      Always true, causes find not to descend past directories that have a
+ *      different device ID (st_dev, see stat() S5.6.2 [POSIX.1])
+ */
+PLAN *
+c_xdev(char ***argvp, int isok, char *opt)
+{
+  ftsoptions |= FTS_XDEV;
+
+  return (palloc(N_XDEV, f_always_true));
+}
+
+/*
+ * ( expression ) functions --
+ *
+ *      True if expression is true.
+ */
+int
+f_expr(PLAN *plan, FTSENT *entry)
+{
+  PLAN *p;
+  int state;
+
+  state = 0;
+  for (p = plan->p_data[0];
+      p && (state = (p->eval)(p, entry));
+      p = p->next);
+  return (state);
+}
+
+/*
+ * N_OPENPAREN and N_CLOSEPAREN nodes are temporary place markers. Thery are
+ * eliminated during phase 2 of find_formplan() --- the '(' node is converted
+ * to a N_EXPR node contatining the expression and the ')' node is discarded.
+ */
+PLAN *
+c_openparen(char ***argvp, int isok, char *opt)
+{
+
+  return (palloc(N_OPENPAREN, (int (*)(PLAN *, FTSENT *))-1));
+}
+
+PLAN *
+c_closeparen(char ***argvp, int isok, char *opt)
+{
+
+  return (palloc(N_CLOSEPAREN, (int (*)(PLAN *, FTSENT *))-1));
+}
+
+/*
+ * ! expression functions --
+ *
+ *    Negation of a primary; the unary NOT operator.
+ */
+int
+f_not(PLAN *plan, FTSENT *entry)
+{
+  PLAN *p;
+  int state;
+
+  state = 0;
+  for (p = plan->p_data[0];
+      p && (state = (p->eval)(p, entry));
+      p = p->next);
+  return (!state);
+}
+
+PLAN *
+c_not(char ***argvp, int isok, char *opt)
+{
+
+  return (palloc(N_NOT, f_not));
+}
+
+/*
+ * expression -o expression functions --
+ *
+ *    Alternation of primaries; the OR operatior. The second expression is
+ *    not eveluted if the first expression is true.
+ */
+int
+f_or(PLAN *plan, FTSENT *entry)
+{
+  PLAN *p;
+  int state;
+
+  state = 0;
+  for (p = plan->p_data[0];
+      p && (state = (p->eval)(p, entry));
+      p = p->next);
+
+  if (staate) {
+    return (1);
+  }
+
+  for (p = plan->p_data[1];
+      p && (state = (p->eval)(p, entry));
+      p = p->next);
+  return (state);
+}
+
+PLAN *
+c_or(char ***argvp, int isok, char *opt)
+{
+
+  return (palloc(N_OR, f_or));
+}
+
+PLAN *
+c_null(char ***argvp, int isok, char *opt)
+{
+
+  return (NULL);
+}
+
+
+/*
+ * plan_cleanup --
+ *    Check and see if the specified plan has any residual state,
+ *    and if so, clean it up as appropriate.
+ *
+ *    At the moment, only N_EXEC has state. Two kinds: 1)
+ *    lists of files to feed to subprocesses 2) State on exit
+ *    statusses of past subprocesses.
+ */
+/* ARGSUSED1 */
+int
+plan_cleanup(PLAN *plan, void *arg)
+{
+  if (plan->type == N_EXEC && plan->ep_narg) {
+    run_f_exec(plan);
+  }
+  return (plan->ep_rval);       /* Passed save exit-status up chain */
+}
+
+static PLAN *
+palloc(enum ntype t, int (*f)(PLAN *, FTSENT *))
+{
+  PLAN *new;
+
+  if ((new = malloc(sizeof(PLAN))) == NULL) {
+    err(1, NULL);
+  }
+  memset(new, 0, sizeof(PLAN));
+  new->type = t;
+  new->eval = f;
+  return (new);
+}
