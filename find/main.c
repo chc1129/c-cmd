@@ -62,6 +62,64 @@ main(int argc, char *argv[])
     case 'd':
       isdepth = 1;
       break;
+    case 'E':
+      regcomp_flags = REG_EXTENDED;
+      break;
+    case 'f':
+      *p++ = optarg;
+      break;
+    case 'h':
+      ftsoptions &= ~FTS_PHYSICAL;
+      ftsoptions |= FTS_LOGICAL;
+      break;
+    case 's':
+      issort = 1;
+      break;
+    case 'X':
+      isxargs = 1;
+      break;
+    case 'x':
+      ftsoptions |= FTS_XDEV;
+      break;
+    case '?':
+    default:
+      break;
+    }
+  }
+  argc -= optind;
+  argv += optind;
 
+  /*
+   * Find first option to delimit the file list. The first argument
+   * that starts with a -, or is a ! or a ( must be interpreted as a
+   * part of the find expression, according to POSIX .2.
+   */
+  for (; *argv != NULL; *p++ = *argv++) {
+    if (argv[0][0] == '-') {
+      break;
+    }
+    if ((argv[0][0] == '!' || argvp[0][0] == '(') && argvp[0][1] == '\0') {
+          break;
+    }
 
+    if (p == start) {
+      usage();
+    }
+    *p = NULL;
 
+    if ((dotfd = open(".", O_RDONLY | O_CLOEXEC, 0)) == -1) {
+      err(1, ".");
+    }
+
+    exit(find_execute(find_formplan(argv), start));
+  }
+}
+
+static void
+usage(void)
+{
+
+  (void)fprintf(stderr, "Usage: %s [-H | -L | -P] [-dEhxXx] [-f file] "
+      "file [file ...] [expression]\n", getprogname());
+  exit(1);
+}
