@@ -53,3 +53,64 @@ brace_subst(char *orig, char **store, char *path, int *len)
   *p  = '\0';
 }
 
+/*
+ * queryuser --
+ *      print a message to standard error and then read input from standard
+ *      input. If the input is 'y' then 1 is returned.
+ */
+int
+queryuser(char **argv)
+{
+  int ch, first, nl;
+
+  (void)fprintf(stderr, "\"%s", *argv);
+  while (*++argv) {
+    (void)fprintf(stderr, " %s", *argv);
+  }
+  (void)fprintf(stderr, "\"? ");
+  (void)fflush(stderr);
+
+  first = ch = getchar();
+  for (nl = 0;;) {
+    if (ch == '\n') {
+      nl = 1;
+      break;
+    }
+    if (ch == EOF) {
+      break;
+    }
+    ch = getchar();
+  }
+
+  if (!nl) {
+    (void)fprintf(stderr, "\n");
+    (void)fflush(stderr);
+  }
+  return (first == 'y');
+}
+
+/*
+ * show_path --
+ *      called on SIGINFO
+ */
+/* ARGSUSED */
+void
+show_path(int sig)
+{
+  extern FTSENT *g_entry;
+  int errno_bak;
+
+  if (g_entry == NULL) {
+    /*
+     * not initialized yet.
+     * assumption; pointer assigment is atomic.
+     */
+    return;
+  }
+
+  errno_bak = errno;
+  write(STDERR_FILENO, "find path: ", 11);
+  write(STDERR_FILENO, g_entry->fts_path, g_entry->fts_pathlen);
+  write(STDERR_FILENO, "\n", 1);
+  errno = errno_bak;
+}
