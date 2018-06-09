@@ -54,4 +54,101 @@ static OPTION const options[] = {
         { "-newer",     N_NEWER,        c_newer,        1 },
 
 /* Aliases for compatablility with Gnu findutils */
+        { "-neweraa",   N_ANEWER,       c_anewer,       1 },
+        { "-newerat",   N_ASINCE,       c_asince,       1 },
+        { "-newercc",   N_CNEWER,       c_cnewer,       1 },
+        { "-newerct",   N_CSINCE,       c_csince,       1 },
+        { "-newermm",   N_NEWER,        c_newer,        1 },
+        { "-newermt",   N_SINCE,        c_since,        1 },
+
+/*
+ * Unimplemented Gnu findutils options
+ *
+ * If you implement any of these, be sure to re-sort the table
+ * in ascii(7) order!
+ *
+        { "-newerBB",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newerBa",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newerBc",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newerBm",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newerBt",   N_UNIMPL,       c_unimpl,       1 },
+        { "-neweraB",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newerac",   N_UNIMPL,       c_unimpl,       1 },
+        { "-neweram",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newerca",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newercm",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newercB",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newermB",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newerma",   N_UNIMPL,       c_unimpl,       1 },
+        { "-newermc",   N_UNIMPL,       c_unimpl,       1 },
+ *
+ */
+
+        { "-nogroup",  N_NOGROUP,       c_nogroup,      0 },
+        { "-nouser",   N_NOUSER,        c_nouser,       0 },
+        { "-o",        N_OR,            c_or,           0 },
+        { "-ok",       N_OK,            c_exec,         1 },
+        { "-or",       N_OR,            c_or,           0 },
+        { "-path",     N_PATH,          c_path,         1 },
+        { "-perm",     N_PERM,          c_perm,         1 },
+        { "-print",    N_PRINT,         c_print,        0 },
+        { "-print0",   N_PRINT0,        c_print0,       0 },
+        { "-printx",   N_PRINTX,        c_printx,       0 },
+        { "-prune",    N_PRUNE,         c_prune,        0 },
+        { "-regex",    N_REGEX,         c_regex,        1 },
+        { "-rm",       N_DELETE,        c_delete,       0 },
+        { "-since",    N_SINCE,         c_since,        1 },
+        { "-size",     N_SIZE,          c_size,         1 },
+        { "-type",     N_TYPE,          c_type,         1 },
+        { "-user",     N_USER,          c_user,         1 },
+        { "-xdev",     N_XDEV,          c_xdev,         0 }
+};
+
+/*
+ * find_create --
+ *      create a node corresponding to a command line argument.
+ *
+ * TODO:
+ *      add create/process function pointers to node, so we can skip
+ *      this switch stuff.
+ */
+PLAN *
+find_create(char ***argvp)
+{
+  OPTION *p;
+  PLAN *new;
+  char **argv;
+  char *opt;
+
+  argv = *argvp;
+  opt = *argv;
+
+  if ((p = option(opt)) == NULL) {
+    errx(1, "%s: unknown option", opt);
+  }
+  ++argv;
+  if (p->arg && !*argv) {
+    errx(1, "%s; requires additional arguments", opt);
+  }
+
+  new = (p->create)(&argv, p->token == N_OK, opt);
+
+  *argvp = argv;
+  return (new);
+}
+
+static OPTION *
+option(char *name)
+{
+  OPTION tmp;
+
+  tmp.name = name;
+  return ((OPTION *)bsearch(&tmp, options, sizeof(options)/sizeof(OPTION), sizeof(OPTION), typecompare));
+}
+
+int
+typecompare(const void *a, const void *b)
+{
+  return (strcmp(((const OPTION *)a)->name, ((const OPTION *)b)->name));
+}
 
