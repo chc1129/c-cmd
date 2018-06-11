@@ -18,7 +18,7 @@
 #include "find.h"
 
 time_t now;                     /* time find was run */
-int dotfd                       /* starting directory */
+int dotfd;                       /* starting directory */
 int ftsoptions;                 /* options for the ftsopen(3) call */
 int isdeprecated;               /* using deprecated syntax */
 int isdepth;                    /* do directroies on post-order visit */
@@ -27,7 +27,8 @@ int issort;                     /* sort directory entries */
 int isxargs;                    /* don't permit xargs delimiting chars */
 int regcomp_flags = REG_BASIC;  /* regex compilation flags */
 
-__dead static void usage(void);
+//__dead static void usage(void);
+static void usage(void);
 
 int
 main(int argc, char *argv[])
@@ -36,7 +37,7 @@ main(int argc, char *argv[])
   int ch;
 
   (void)time(&now);             /* initialize the time-of-day */
-  (void)setlocal(LC_ALL, "");
+  (void)setlocale(LC_ALL, "");
 
   /* array to hold dir list.  at most (argc - 1) elements. */
   p = start = malloc(argc * sizeof (char *));
@@ -98,8 +99,8 @@ main(int argc, char *argv[])
     if (argv[0][0] == '-') {
       break;
     }
-    if ((argv[0][0] == '!' || argvp[0][0] == '(') && argvp[0][1] == '\0') {
-          break;
+    if ((argv[0][0] == '!' || argv[0][0] == '(') && argv[0][1] == '\0') {
+      break;
     }
 
     if (p == start) {

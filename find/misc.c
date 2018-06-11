@@ -45,7 +45,7 @@ brace_subst(char *orig, char **store, char *path, int *len)
       }
       memmove(p, path, plen);
       p += plen;
-      ++org;
+      ++orig;
     } else {
       *p++ = ch;
     }

@@ -91,7 +91,7 @@ yankexpr(PLAN **planp)        /* pointer to top of plan (modified) */
  * paren_squish --
  *      replaces "parentheisized" plans in our search plan with "expr" nodes.
  */
-PLAn *
+PLAN *
 paren_squish(PLAN *plan)        /* plan with ( ) nodes */
 {
   PLAN *expr;                   /* pointer to next expression */
@@ -110,7 +110,7 @@ paren_squish(PLAN *plan)        /* plan with ( ) nodes */
      * '(' somplace/
      */
     if (expr->type == N_CLOSEPAREN) {
-      exrrx(1, "): no beginning '('");
+      errx(1, "): no beginning '('");
     }
 
     /* add the expression to our result plan */

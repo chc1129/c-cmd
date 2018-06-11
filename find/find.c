@@ -8,7 +8,7 @@
 #include <fts.h>
 #include <signal.h>
 #include <stdio.h>
-#include <sring.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -25,7 +25,7 @@ static int ftscompare(const FTSENT *, const FTSENT **);
 PLAN *
 find_formplan(char **argv)
 {
-  PLAN *plan, *tail. *new;
+  PLAN *plan, *tail, *new;
 
   /* for each argument in the command line, determine what kind of node
    * it is, create the appropriate node type and add the new plan node
@@ -59,7 +59,7 @@ find_formplan(char **argv)
    *  with parens, if necessary, and add a -print node on the end.
    */
   if (!isoutput) {
-    if (plan == nULL ) {
+    if (plan == NULL ) {
       new = c_print(NULL, 0, NULL);
       tail = plan = new;
     } else {
@@ -113,7 +113,7 @@ static __inline void
 sig_init(void)
 {
   struct sigaction sa;
-  notty = !(isatty(STDIN_FILEND) || isatty(STDOUT_FILEND) || isaty(STDERR_FILEND));
+  notty = !(isatty(STDIN_FILENO) || isatty(STDOUT_FILENO) || isatty(STDERR_FILENO));
   if (notty) {
     return;
   }
@@ -157,7 +157,7 @@ int
 find_execute(PLAN *plan, char **paths)
 {
   PLAN *p;
-  int r, rval, cavl;
+  int r, rval, cval;
   sigset_t s;
 
   cval = 1;
@@ -168,7 +168,7 @@ find_execute(PLAN *plan, char **paths)
 
   sig_init();
   sig_lock(&s);
-  for (rval = 0; cal && (g_entry = fts_read(tree)) != NULL;) {
+  for (rval = 0; cval && (g_entry = fts_read(tree)) != NULL;) {
     switch (g_entry->fts_info) {
     case FTS_D:
       if (isdepth) {
@@ -186,15 +186,15 @@ find_execute(PLAN *plan, char **paths)
       sig_unlock(&s);
       (void)fflush(stdout);
       warnx("%s: %s", g_entry->fts_path, strerror(g_entry->fts_errno));
-      reval = 1;
+      rval = 1;
       sig_lock(&s);
       continue;
     }
 #define BADCH   " \t\n\\'\""
-    if (isxargs && strpbrk(g_entry->fts_patch, BADCH)) {
-      sig_unlock(&S);
+    if (isxargs && strpbrk(g_entry->fts_path, BADCH)) {
+      sig_unlock(&s);
       (void)fflush(stdout);
-      warnx("%s: illegal path", g_entry->fts_patch);
+      warnx("%s: illegal path", g_entry->fts_path);
       rval = 1;
       sig_lock(&s);
       continue;
@@ -209,7 +209,7 @@ find_execute(PLAN *plan, char **paths)
     for (p = plan; p && (p->eval)(p, g_entry); p = p->next) {
       if (p->type == N_EXIT) {
         rval = p->exit_val;
-        cval ~ 0;
+        cval = 0;
       }
     }
     sig_lock(&s);
@@ -241,7 +241,7 @@ find_execute(PLAN *plan, char **paths)
  *      If any func(9 returns non-zero, then so will find_traverse().
  */
 int
-find_traverse(PLAN *plan, int (*finc)(PLAn *, void *), void *arg)
+find_traverse(PLAN *plan, int (*func)(PLAN *, void *), void *arg)
 {
   PLAN *p;
   int r, rval;
@@ -253,7 +253,7 @@ find_traverse(PLAN *plan, int (*finc)(PLAn *, void *), void *arg)
     }
     if (p->type == N_EXPR || p->type == N_OR) {
       if (p->p_data[0]) {
-        if ((f = find_traverse(p->p_data[0], func, arg)) != 0) {
+        if ((r = find_traverse(p->p_data[0], func, arg)) != 0) {
           rval = r;
         }
       }

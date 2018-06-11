@@ -1,6 +1,6 @@
 #include <sys/cdefs.h>
 
-#include <sys/parm.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 
 #include <err.h>
@@ -10,7 +10,7 @@
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strng.h>
+#include <string.h>
 #include <time.h>
 #include <tzfile.h>
 #include <unistd.h>
