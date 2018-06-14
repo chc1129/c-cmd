@@ -73,7 +73,7 @@ main(int argc, char *argv[])
    * Given that the smallest argument is 2 bytes in length, this
    * means that the number of arguments is limited to:
    *
-   *      {ARG_MAX - 4K - LENGTh(env + utility + arguments)) / 2.
+   *      (ARG_MAX - 4K - LENGTh(env + utility + arguments)) / 2.
    *
    * We arbitrarily limit the number of arguments to 5000. This is
    * allowed by POSIX.2 as long as the resulting minimum exec line is
@@ -182,4 +182,64 @@ main(int argc, char *argv[])
       errx(1, "replstr may not be empty");
     }
 
+    /*
+     * Allocate pointers or teh utility name, the utility arguments,
+     * the maximum arguments to be read from stdin and the trailing
+     * NULL.
+     */
+    linelen = 1 + argc * nargs + 1;
+    if ((av = bxp = malloc(linelen * sizeof(char **))) == NULL) {
+      errx(1, "malloc failed");
+    }
+
+    /*
+     * Use the user's name for the utility as argv[0], just like the
+     * shell. Echo is the default. Set up pointers for the user's
+     * arguments.
+     */
+    if (*argv == NULL) {
+      cnt = strlen(*bxp++ = echo);
+    } else {
+      do {
+        if (Jflag && strcmp(*argv, replstr) == 0) {
+          char **avj;
+          jfound = 1;
+          argv++;
+          for (avj = argv; *avj; avj++) {
+            cnt += strlen(*avj) + 1;
+          }
+          break;
+        }
+        cnt += strlen(*bxp++ = *argv) + 1;
+      } while (*++argv != NULL);
+    }
+
+    /*
+     * Set up begin/end/traversing pointers into the arrray. The -n
+     * count doesn't include the trailing NULL pointer, so the malloc
+     * added in an extra slot.
+     */
+    endxp = (xp = bxp) + nargs;
+
+    /*
+     * Allocate buffer space for the arguments read from stdin and the
+     * trailing NULL. Buffer sace is defined as the default or specified
+     * space, minus the length of the utility name and arguments. Set up
+     * begin/end/traversing pointers into the array. The -s count does
+     * include the trailing NULL, so the malloc didn't add in an extra
+     * slot.
+     */
+    nline -= cnt;
+    if (nline <= 0) {
+      errx(1, "insufficient space for command");
+    }
+    if ((bbp = malloc((size_t)(nline + 1))) == NULL) {
+      errx(1, "malloc failed");
+    }
+    ebp = (argp = p = bbp) + nline - 1;
+    for (;;) {
+      parse_input(argc, argv);
+    }
+  }
+}
 
