@@ -243,3 +243,16 @@ main(int argc, char *argv[])
   }
 }
 
+static void
+parse_input(int argc, char *argv[])
+{
+  int ch, foundeof;
+  char **avj;
+
+  foundeof = 0;
+
+  switch (ch = getchar()) {
+  case EOF:
+    /* No arguments since last exec. */
+    if (p == bbp) {
+
