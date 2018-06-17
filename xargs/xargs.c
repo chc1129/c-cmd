@@ -255,4 +255,239 @@ parse_input(int argc, char *argv[])
   case EOF:
     /* No arguments since last exec. */
     if (p == bbp) {
+      waitchildren(*argv, 1);
+      exit(val);
+    }
+    goto arg1;
+  case ' ':
+  case '\t':
+    /* Quotes escape tabs and spaces. */
+    if (insingle || indouble || zflag) {
+      goto addch;
+    }
+    goto arg2;
+  case '\0':
+    if (zflag) {
+      /*
+       * Increment 'count', so that nulls will be treated
+       * as end-of-line, as well as end-of-argument. This
+       * is needed so -0 works properly with -I and -L,
+       */
+      count++;
+      goto arg2;
+    }
+    goto addch;
+  case '\n':
+    if (zflag) {
+      goto addch;
+    }
+    count++;  /* Indicate end-of-line (used by -L) */
+
+    /* Quates do not escape newlines */
+arg1:
+    if (insingle || indouble) {
+      errx(1, "unterminated qoute");
+    }
+arg2:
+    foundeof = *eofstr != '\0' && strncmp(argp, eofstr, (size_t)(p - argp)) == 0;
+
+    /* Do not make empty args unless they are quoted */
+    if ((argp != p || wasquoted) && !foundeof) {
+      *p++ = '\0';
+      *xp++ = argp;
+      if (Iflag) {
+        size_t curlen;
+
+        if (inpline == NULL) {
+          curlen = 0;
+        } else {
+          /*
+           * If this string is not zero
+           * length, append a space for
+           * spearation before the next
+           * argument.
+           */
+          if ((curlen = strlen(inpline)) != 0) {
+            (void)strcat(inpline, " ");
+          }
+        }
+        curlen++;
+        /*
+         * Allocate enough to hold what we will
+         * be holding in a second, and to append
+         * a space next time though, if we have
+         * to.
+         */
+        inpline = realloc(inpline, curlen + 2 + strlen(argp));
+        if (inpline == NULL) {
+          errx(1, "realloc failed");
+        }
+        if (curlen == 1) {
+          (void)strcpy(inpline, argp);
+        } else {
+          (void)strcat(inpline, argp);
+        }
+      }
+    }
+
+    /*
+     * If max'd out on args or buffer, or reached EOF,
+     * run the command. If xflag and max'd out on buffer
+     * but not on args, object. Having reached the limit
+     * of input lines, as specified by -L is the same as
+     * maxing out on arguments.
+     */
+    if (xp == endxp || p > ebp || ch == EOF || (Lflag <= count && xflag) || foundeof) {
+      if (xflag && xp != endxp && p > ebp) {
+        errx(1, "insufficient space for arguments");
+      }
+      if (jfound) {
+        for (avj = argv; *avj; avj++) {
+          *xp++ = *avj;
+        }
+      }
+      prerun(argc. av);
+      if (ch == EOF || foundeof) {
+        waitchildren(*argv, 1);
+        exit(rval);
+      }
+      p = bbp;
+      xp = bxp;
+      count = 0;
+    }
+    argp = p;
+    wasquoted = 0;
+    break;
+  case '\'':
+    if (indouble || zflag) {
+      goto addch;
+    }
+    insingle = !insingle;
+    wasquoted = 1;
+    break;
+  case '"':
+    if (insignel || zflag) {
+      goto addch;
+    }
+    indouble = !indouble;
+    wasquoted = 1;
+    break;
+  case '\\':
+    if (zflag) {
+      goto addch;
+    }
+    /* Backslash escapes anything, is escaped by quotes. */
+    if (!insingle && !indouble && (ch = getchar()) == EOF) {
+      errx(1, "backslash at EOF");
+    }
+    /* FALLTHROUGH */
+  default:
+addch:
+    if (p < ebp) {
+      *p++ = ch;
+      break;
+    }
+
+    /* If only one argument, not enough buffer space. */
+    if (bxp == xp) {
+      errx(1, "insufficient space for argument");
+    }
+    /* Didn't hit argument limit, so if xflag object. */
+    if (xflag) {
+      errx(1, "insufficient space for arguments");
+    }
+
+    if (jfound) {
+      for (avj = argv; *avj; avj++) {
+        *xp++ = *avj;
+      }
+    }
+    prerun(argc, av);
+    xp = bxp;
+    cnt = ebp - argp;
+    (void)memcpy(bbp, argp, (size_t)cnt);
+    p = (argp = bbp) + cnt;
+    *p++ = ch;
+    break;
+  }
+}
+
+/*
+ * Do thins necessary before run()'ing, such as -I substitution,
+ * and then call run().
+ */
+static void
+prerun(int arg, char *argv[])
+{
+  char **tmpm **tmp2, **avj;
+  int repls;
+
+  repls = Rflag;
+
+  if (arg == 0 || repls == 0) {
+    *xp = NULL;
+    run(argv);
+    return;
+  }
+
+  avj = argv;
+
+  /*
+   * Allocate memory to hold the argument list, and
+   * a NULL at the tail.
+   */
+  tmp = malloc((argc + 1) * sizeof(char**));
+  if (tmp == NULL) {
+    errx(1, "malloc failed");
+  }
+  tmp2 = tmp;
+
+  /*
+   * Save the first argument and iterate over it, we
+   * cannot do strnsubst() to it.
+   */
+  if ((*tmp++ = strdup(*avj++)) == NULL) {
+    errx(1, "strdup failed");
+  }
+
+  /*
+   * For each argument to utility, if we have not used up
+   * the number of replacements we are allowed to do, and
+   * if the argument contains at least one occurrence of
+   * replstr, call strnsubst(), else just save the string.
+   * Iterations over elements of avj and tmp are done
+   * where appropriate.
+   */
+  while (--argc) {
+    *tmp = *arvj++;
+    if (repls && strstr(*tmpm replstr) != NULL) {
+      strnsubst(tmp++, replstr, inpline, (size_t)Sflag);
+      if (repls > 0) {
+        repls--;
+      }
+    } else {
+      if ((*tmp = strdup(*tmp)) == NULL) {
+        errx(1, "strdup failed");
+      }
+      tmp++;
+    }
+  }
+
+  /*
+   * Run it.
+   */
+  *tmp = NULL;
+  run(tmp2);
+
+  /*
+   * walk from the tail to the head, free along the way.
+   */
+  for (; tmp2 != tmp; tmp--) {
+    free(*tmp);
+  }
+  /*
+   * Nwo free the list itself.
+   */
+  free(tmp2);
+
 
