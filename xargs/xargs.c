@@ -1,6 +1,6 @@
 #include <sys/cdefs.h>
 
-#include <sys/parm.h>
+#include <sys/param.h>
 #include <sys/wait.h>
 
 #include <err.h>
@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include <unsitd.h>
+#include <unistd.h>
 
 #include "pathnames.h"
 
@@ -486,8 +486,159 @@ prerun(int arg, char *argv[])
     free(*tmp);
   }
   /*
-   * Nwo free the list itself.
+   * Now free the list itself.
    */
   free(tmp2);
 
+  /*
+   * Free the input line buffer, if we have one.
+   */
+  if (inpline != NULL) {
+    free(inpline);
+    inpline = NULL;
+  }
+}
 
+static void
+run(char **argv)
+{
+  int fd;
+  char **avec;
+
+  /*
+   * If the user wants to be notified of each command before it is
+   * executed, notify them. If they want the notification to be
+   * followed by a prompt, then prompt them.
+   */
+  if (tflag || pflag) {
+    (void)fprintf(stderr, "%s", *argv);
+    for (avec = argv + 1; *avec != NULL; ++avec) {
+      (void)fprintf(stderr, " %s", *svec);
+    }
+    /*
+     * If the user has asked to be prompted, do so.
+     */
+    if (pflag) {
+      /*
+       * If they asked not to exec, return without execution
+       * but if they asked to, go to the execution. If we
+       * could not open their tty, break the switch and drop
+       * back to -t behaviour.
+       */
+      switch (promp()) {
+      case 0:
+        return;
+      case 1:
+        goto exec;
+      case 2:
+        break;
+      }
+    }
+    (void)fprintf(stderr, "\n");
+    (void)fflush(stderr);
+  }
+exec:
+  childerr = 0;
+  switch (vfork()) {
+  case -1:
+    err(1, "vfork");
+    /* NOTREACHED */
+  case 0:
+    if (oflag) {
+      if ((fd = open(_PATH_TTY, O_RDONLY)) == -1) {
+        err(1, "can't open /dev/tty");
+      }
+    } else {
+      fd = open(_PATH_DEVNULL, O_RDONLY);
+    }
+    if (fd > STDIN_FILENO) {
+      if (dup2(fd, STDIN_FILENO) != 0) {
+        err(1, "can't dup2 to stdin");
+      }
+      (void)close(fd);
+    }
+    (void)execvp(argv[0], argv);
+    childerr = errno;
+    _exit(1);
+  }
+  curprocs++;
+  waitchildren(*argv, 0);
+}
+
+static void
+waitchildren(const char *name, int waitall)
+{
+  pid_t pid;
+  int status;
+
+  while ((pid = waitpid(-1, &status, !waitall && curprocs < maxprocs ? WNOHANG : 0)) > 0) {
+    curprocs--;
+    /* If we couldn't invoke the utility, exit */
+    if (childerr != 0) {
+      errno = childerr;
+      err(errno == ENOENT ? 127 : 126, "%s", name);
+    }
+    /*
+     * According to POSIX, we have to exit if the utility exits
+     * with a 255 status, or is interrupted by a signal. xargs
+     * is allowed to return any exit status between 1 and 125
+     * in these cases, but we'll use 124 and 125, the same
+     * values used by GNU xargs.
+     */
+    if (WIFEXITED(status)) {
+      if (WEXITSTATUS (status) == 255) {
+        warnx ("%s exited with status 255", name);
+        exit(124);
+      } else if (WEXITSTATUS (status) != 0) {
+        rval = 123;
+      }
+    } else if (WIFSIGNALED (status)) {
+      if (WTERMSIG(status) < NSIG) {
+        warnx("%s terminated by SIG%s", name, sys_signame[WTERMSIG(status)]);
+      } else {
+        warnx("%s terminated by sinal %d", name, WTERMSIG(status));
+      }
+      exit(125);
+    }
+  }
+  if (pid == -1&& errno != ECHILD) {
+    err(1, "waitpid");
+  }
+}
+
+/*
+ * Prompt the user about running a command.
+ */
+static int
+prompt(void)
+{
+  regex_t cre;
+  size_t rsize;
+  int match;
+  char *response;
+  FILE *ttyfp;
+
+  if ((ttyfp = fopen(_PATH_TTY, "r")) == NULL) {
+    return (2); /* Indicate that the TTY failed to open. */
+  }
+  (void)fprintf(stderr, "?...");
+  (void)fflush(stderr);
+  if ((response = fgetln(ttyfp, &rsize)) == NULL || regcomp(&cre, nl_langinfo(YESEXPR), REG_BASIC) != 0) {
+    (void)fclose(ttyfp);
+    return (0);
+  }
+  response[rsize - 1] = '\0';
+  match = regexec(&cre, response, 0, NULL, 0);
+  (void)fclose(ttyfp);
+  regfree(&cre);
+  return (match == 0);
+}
+
+static void
+usage(void)
+{
+  (void)fprintf(stderr, "Usage: %s[-0opt] [-E eofstr] [-I replstr [-R replacements] [-S replsize]]\n"
+                        "            [-J replstr] [-L number] [-n number [-x]] [-P maxprocs]\n"
+                        "            [-s size] [utility [argument ...]]\n", getprogname());
+              exit(1);
+}
