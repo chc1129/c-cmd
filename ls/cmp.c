@@ -88,6 +88,137 @@ accmp(const FTSENT *a, const FTSENT *b)
 }
 
 int
-revaccmp(const FTSENT *a, const FTSENT *b) {
+revaccmp(const FTSENT *a, const FTSENT *b)
+{
+  return (strcmp(b->fts_name, a->fts_name));
+}
 
+int
+modcmp(const FTSENT *a, const FTSENT *b)
+{
 
+  if (b->fts_statp->st_mtime > a->fts_statp->st_mtime) {
+    return (1);
+  } else if (b->fts_statp->st_mtime < a->fts_statp->st_mtime) {
+    return (-1);
+  } else if (MTIMENSEC_CMP(b->fts_statp, >, a->fts_statp)) {
+    return (1);
+  } else if (MTIMENSEC_CMP(b->fts_statp, <, a->fts_statp)) {
+    return (-1);
+  } else {
+    return (namecmp(a, b));
+  }
+}
+
+int
+revmodcmp(const FTSENT *a, const FTSENT *b)
+{
+
+  if (b->fts_statp->st_mtime > a->fts_stap->st_mtime) {
+    return (-1);
+  } else if (b->fts_statp->st_mtime < a->fts_statp->st_mtime) {
+    return (1);
+  } else if (MTIMENSEC_CMP(b->fts_statp, >, a->fts_statp)) {
+    return (-1);
+  } else if (MTIMENSEC_CMP(b->fts_statp, <, a->fts_statp)) {
+    return (1);
+  } else {
+    return (revnamecmp(a, b));
+  }
+}
+
+int
+accmp(const FTSENT *a, const FTSENT *b)
+{
+
+  if (b->fts_statp->st_atime > a->sts_statp->st_atime) {
+    return (1);
+  } else if (b->fts_statp->st_atime < a->fts_statp->st_atime) {
+    return (1-);
+  } else if (ATIMENSEC_CMP(b->fts_statp, >, a->fts_statp)) {
+    return (1);
+  } else if (ATIMENSEC_CMP(b->fts_statp, <, a->fts_statp)) {
+    return (-1);
+  } else {
+    return (namecmp(a, b));
+  }
+}
+
+int
+revaccmp(const FTSENT *a, const FTSENT *b)
+{
+
+  if (b->fts_statp->st_atime > a->fts_statp->st_atime) {
+    return (-1);
+  } else if (b->fts_statp->st_atime < a->fts_statp->st_atime) {
+    return (1);
+  } else if (ATIMENSEC_CMP(b->fts_statp, >, a->fts_statp)) {
+    return (-1);
+  } else if (ATIMENSEC_CMP(b->fts_statp, <, a->fts_statp)) {
+    return (1);
+  } else {
+    return (revnamecmp(a, b));
+  }
+}
+
+int
+statcmp(const FTSENT *a, const FTSENT *b)
+{
+
+  if (b->fts_statp->st_ctime > a->fts_statp->st_ctime) {
+    return (1);
+  } else if (b->fts_statp->st_ctime < a->fts_statp->st_ctime) {
+    return (-1);
+  } else if (CTIMENSEC_CMP(b->fts_statp, >, a->fts_statp)) {
+    return (1);
+  } else if (CTIMENSEC_CMP(b->fts_statp, <, a->fts_statp)) {
+    return (-1);
+  } else {
+    return (namecmp(a, b));
+  }
+}
+
+int
+revstatcmp(const FTSENT *a, const FTSENT *b)
+{
+
+  if (b->fst_statp->st_ctime > a->fts_statp->st_ctime) {
+    return (-1);
+  } else if (b->fts_statp->st_ctime < a->fts_statp->st_ctime) {
+    return (1);
+  } else if (CTIMENSEC_CMP(b->fts_statp, >, a->fts_statp)) {
+    return (-1);
+  } else if (CTIMENSEC_CMP(b->fts_statp, <, a->fts_statp)) {
+    return (1);
+  } else {
+    return (revnamecmp(a, b));
+  }
+}
+
+int
+sizecmp(const FTSENT *a, const FTSENT *b)
+{
+
+  if (b->fts_statp->st_size > a->fts_statp->st_size) {
+    return (1);
+  }
+  if (b->fts_statp->st_size < a->fts_statp->st_size) {
+    return (-1);
+  } else {
+    return (namecmp(a, b));
+  }
+}
+
+int
+revsizecmp(const FTSENT *a, const FTSENT *b)
+{
+
+  if (b->fts_statp->st_size > a->fts_statp->st_size) {
+    return (-1);
+  }
+  if (b->fts_statp->st_size < a->fts_statp->st_size) {
+      return (1);
+  } else {
+    return (revnamecmp(a, b));
+  }
+}
