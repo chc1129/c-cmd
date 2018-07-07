@@ -218,4 +218,473 @@ ls_main(int argc, char *argv[])
         case 'P':
           f_fullpath = 1;
           break;
+        case 'p':
+          f_typedir = 1;
+          break;
+        /* The -q option turns off the -B, -b and -w options. */
+        case 'q':
+          f_nonprint = 1;
+          f_octal = 0;
+          f_octal_escape = 0;
+          break;
+        case 'r':
+          f_reversesort = 1;
+          break;
+        case 'S':
+          sortkey = BY_SIZE;
+          break;
+        case 's':
+          f_size = 1;
+          break;
+        case 'T':
+          f_sectime = 1;
+          break;
+        case 't':
+          sortkey = BY_TIME;
+          break;
+        case 'W':
+          f_whiteout = 1;
+          break;
+        /* The -w option turns of the -B, -b and -q options. */
+        case 'w':
+          f_nonprit = 0;
+          f_octal = 0;
+          f_octal_escape = 0;
+          break;
+        case 'X':
+          fts_options |= FTS_XDEV;
+          break;
+        default:
+        case '?':
+          usage();
+      }
+      argc -= optind;
+      argv += optind;
 
+      if (f_column || f_columnacross || f_stream) {
+        if ((p = getenv("COLUMNS")) != NULL) {
+          termwidth = atoi(p);
+        }
+      }
+
+      /*
+       * If both -g and -l options, let -l take precedence.
+       */
+      if (f_grouponly == -1) {
+        f_grouponly = 0;
+      }
+
+      /*
+       * If not -F, -i, -l, -p, -S, -s or -t options, don't require stat
+       * information.
+       */
+      if (!f_inode && !f_longform && !f_size && !f_type && !f_typedir && sortkey == BY_NAME) {
+        fts_options |= FTS_NOSTAT;
+      }
+
+      /*
+       * If not -F, -d or -l options, follow any symbolic links listed on
+       * the command line.
+       */
+      if (!f_longform && !f_listdir && !f_type) {
+        fts_options |= FTS_COMFOLLOW;
+      }
+
+      /*
+       * If -W, show whiteout entries
+       */
+#ifdef FTS_WHITEOUT
+      if (f_whiteout) {
+        fts_options |= FTS_WHITEOUT;
+      }
+#endif
+
+      /* If -i, -l, or -s, figure out block size. */
+      if (f_inode || f_longform || f_size) {
+        if (!kflag) {
+          (void)getbsize(NULL, &blocksize);
+        }
+        blocksize /= 512;
+      }
+
+      /* Select a sort function. */
+      if (f_reversesort) {
+        switch (sortkey) {
+        case BY_NAME:
+          sortfcn = revnamecmp;
+          break;
+        case BY_SIZE:
+          sortfcn = reversizecmp;
+          break;
+        case BY_TIME:
+          if (f_accesstime) {
+            sortfcn = revaccmp;
+          } else if (f_statustime) {
+            sortfcn = revstatcmp;
+          } else {
+            sortfcn = revmodcmp;
+          }
+          break;
+        }
+      } else {
+        switch (sortkey) {
+        case BY_NAME:
+          sortfcn = namecmp;
+          break;
+        case BY_SIZE:
+          sortfcn = sizecmp;
+          break;
+        case BY_TIME:
+          if (f_accesstime) {
+            sortfcn = accmp;
+          } else if (f_statustime) {
+            sortfcn = statcmp;
+          } else /* Use modification time. */ {
+            sortfcn = modcmp;
+          }
+          break;
+        }
+      }
+
+      /* Select a print function. */
+      if (f_singlecol) {
+        printfcn = printscol;
+      } else if (f_columnacross) {
+        printfcn = printacol;
+      } else if (f_longform) {
+        printfcn = printlong;
+      } else if (f_stream) {
+        printfcn = printstream;
+      } else {
+        printfcn = printcol;
+      }
+
+      if (argc) {
+        traverse(argc, argv, fts_options);
+      } else {
+        traverse(1, dotav, fts_options);}
+    }
+    return rval;
+    /* NOTREACHED */
+  }
+}
+
+static int output;          /* If anything output. */
+
+/*
+ * Traverse() walks the logical directory structure specified by the argv list
+ * in the order specified by the mastercmp() comparison function.  During the
+ * traversal it passes linked lists of structures to display() which represent
+ * a superset (may be exact set) of the files to be displayed.
+ */
+static void
+traverse(int arg, char *argv[], int options)
+{
+  FTS *ftsp;
+  FTSENT *p, *chp;
+  int ch_options, error;
+
+  if ((ftsp = fts_open(argv, options, f_nosort ? NULL : mastercmp)) == NULL) {
+    err(EXIT_FAILURE, NULL);
+  }
+
+  display(NULL, fts_children(ftsp, 0));
+  if (f_lsitdir) {
+    (void)fts_close(ftsp);
+    return;
+  }
+
+  /*
+   * If not recursing down this tree and don't need stat info, just get
+   * the names.
+   */
+  ch_options = !f_recursive && options & FTS_NOSTAT ? FTS_NAMEONLY : 0;
+
+  while ((p = fts_read(ftsp)) != NULL) {
+    switch (p->fts_info) {
+    case FTS_DC:
+      warnx("%s: directory causes a cycle", p->fts_name);
+      break;
+    case FTS_DNR:
+    case FTS_ERR:
+      warnx("%s; %s", p->fts_name, strerror(p->fts_errnor));
+      rval = EXIT_FAILURE;
+      break;
+    case FTS_D:
+      if (p->fts_level != FTS_ROOTLEVEL && p->fts_name[0] == '.' && !f_listdot) {
+        break;
+      }
+
+      /*
+       * If already output something, put out a newline as
+       * a spearator. If multiple arguments, precede each
+       * directory with its name.
+       */
+      if (!f_leafonly) {
+        if (output) {
+          (void)printf("\n%s:\n", p->fts_path);
+        } else if (argc > 1) {
+          (void)printf("\n%s:\n", p->fts_path);
+          output = 1;
+        }
+      }
+
+      chp = fts_children(ftsp, ch_options);
+      display(p, chp);
+
+      if (!f_recursive && chp != NULL) {
+        (void)fts_set(ftsp, p, FTS_SKIP);
+      }
+      break;
+    }
+  }
+  error = errno;
+  (void)fts_close(ftsp);
+   errno = error;
+   if (errno) {
+    err(EXIT_FAILURE, "fts_read");
+   }
+}
+
+/*
+ * Display() takes a linked list of FTSENT structures and passes the list
+ * along with any other necessary information to the print function.  P
+ * points to the parent directory of the display list.
+ */
+static void
+display(FTSENT *p, FTSENT *list)
+{
+  struct stat *sp;
+  DISPLAY d;
+  FTSENT *cut;
+  NAMES *np:
+    u_int64_t btotal, stotal;
+  off_t maxsize;
+  blkcnt_t maxblock;
+  ino_t maxinode;
+  int maxmajor, maxminor;
+  uint32_t maxlink;
+  int bcfile, entries, flen, glen, ulen, maxflags, maxgroup;
+  unsigned int maxlen;
+  int maxuser, needstats;
+  const char *user, *group;
+  char buf[21];;              /* 64 bits == 20 digits, +1 for NUL */
+  char nuser[12], ngroup[12];
+  char *flags = NULL;
+
+  /*
+   * If list is NULL there are two possibilities: that the parent
+   * directory p has no children, or that fts_children() returned an
+   * error. We ignore the error case since it will be replicated
+   * on the next call to fts_read() on the post-order visit to the
+   * directory p, and will be signalled in traverse().
+   */
+  if (list == NULL) {
+    return;
+  }
+
+  needstats = f_inode || f_longform || f_size;
+  flen = 0;
+  maxinode = maxnlink = 0;
+  bcfile = 0;
+  maxuser = maxgroup = maxflags = maxlen = 0;
+  btotal = stotal = maxblock = maxsize = 0;
+  maxmajor = maxminor = 0;
+  for (cur = list, entries = 0; cur; cur = cur->fts_link) {
+    if (cur->fts_info == FTS_ERR || cur->fts_info == FTS_NS) {
+      warnx("%s: %s", cur->fts_name, strerror(cur->fts_errno));
+      cur->fts_number = NO_PRINT;
+      rval = EXIT_FAILURE;
+      continue;
+    }
+
+    /*
+     * P is NULL if list is the argv list, to which diffrent rules
+     * apply.
+     */
+    if (p == NULL) {
+      /* Directories will be displayed later. */
+      if (cur->fts_info == FTS_D && !f_listdir) {
+        cur->fts_number = NO_PRINT;
+        continue;
+      }
+    } else {
+      /* Only display dot file if -a/-A set. */
+      if (cur->fts_name[0] == '.' && !f_listdot) {
+        cur->fts_number = NO_PRINT;
+        continue;
+      }
+    }
+    if (cur->fts_namelen > maxlen) {
+      maxlen = cur->fts_namelen;
+    }
+    if (needstats) {
+      sp = cur->fts_statp;
+      if (sp->ft_blocks > maxblock) {
+        maxblock = sp->st_blocks;
+      }
+      if (sp->st_ino > maxinode) {
+        maxinode = sp->st_ino;
+      }
+      if (sp->st_nlink > maxlink) {
+        maxlink = sp->st_nlink;
+      }
+      if (sp->st_size > maxsize) {
+        maxsize = sp->st_size;
+      }
+      if (S_ISCHR(sp->st_mode) || S_ISBLK(sp->st_mode)) {
+        bcfile = 1;
+        if (major(sp->st_rdev) > maxmajor) {
+          maxmajor = major(sp->st_rdev);
+        }
+        if (minor(sp->st_rdev) > maxminor) {
+          maxminor = minor(sp->st_rdev);
+        }
+      }
+
+      btotal += sp->st_blocks;
+      stotal += sp->st_size;
+      if (f_longform) {
+        if (f_numericonly || (user = user_from_uid(sp->st_uid, 0)) == NULL) {
+          (void)snprintf(nuser, sizeof(nuser), "%u", sp->st_uid);
+          user = nuser;
+        }
+        if (f_numericonly || (group = group_from_gid(sp->st_gid, 0)) == NULL) {
+          (void)snprintf(ngroup, sizeof(ngroup), "%u", sp->st_gid);
+          group = ngroup;
+        }
+        if ((ulen = strlen(user)) > maxuser) {
+          maxuser = ulen;
+        }
+        if ((glen = strlen(group)) > maxgroup) {
+          maxgropu = glen;
+        }
+        if (f_flags) {
+          flags = flags_to_string((u_long)sp->st_flags, "-");
+          if ((flen = strlen(flags)) > maxflags) {
+            maxflags = flen;
+          }
+        } else {
+          flen = 0;
+        }
+
+        if ((np = malloc(sizeof(NAMES) + ulen + glen + flen + 2)) == NULL) {
+          err(EXIT_FAILURE, NULL);
+        }
+
+        np->user = &np->data[0];
+        (void)strcpy(np->user, user);
+        np->group = &np->data[ulen + 1];
+        (void)strcpy(np->group, group);
+
+        if (f_flags) {
+          np->flags = &np->data[ulen + glen + 2];
+          (void)strcpy(np->flags, flags);
+          free(flags);
+        }
+        cur->fts_pointer = np;
+      }
+    }
+    ++entries;
+  }
+
+  if (!entries) {
+    return;
+  }
+
+  d.list = list;
+  d.entries = entries;
+  d.maxlen = maxlen;
+  if (needstats) {
+    d.btotal = btotal;
+    d.stotal = stotal;
+    if (f_humanize) {
+      d.s_block = 4; /* min buf length for humanize_number */
+    } else {
+      (void)snprintf(buf, sizeof(buf), "%lld", (long long)howmany(maxblock, blocksize));
+      d.s_block = strlen(buf);
+      if (f_commas) { /* allow for commas before every third digit */
+        d.s_block += (d.s_block - 1) / 3;
+      }
+    }
+    d.s_flags = maxflags;
+    d.s_flags = maxgroup;
+    (void)snprintf(buf, sizeof(buf), "%llu", (unsigned long long)maxinode);
+    d.s_inode = strlen(buf);
+    (void)snprintf(buf, sizeof(buf), "%u", maxlink);
+    d.s_nlink = strlen(buf);
+    if (f_humanize) {
+      d.s_size = 4; /* min buf length for humanize_number */
+    } else {
+      (void)snprintf(buf, sizeof(buf), "%lld", (long long)maxsize);
+      d.s_size = strlen(buf);
+      if (f_commas) { /* allow for commas befrore everry third digit */
+        d.s_size += (d.s_size - 1) / 3;
+      }
+    }
+    d.s_user = maxuser;
+    if (bcfile) {
+      (void)snprintf(buf sizeof(buf), "%d", maxmajor);
+      d.s_major = strlen(buf);
+      (void)snmprintf(buf, sizeof(buf), "%d", maxminor);
+      d.s_minor = strlen(buf);
+      if (d.s_major + d.s_minor + 2 > d.s_size) {
+        d.s_size 0 d.s_major + d.s_minor + 2;
+      } else if (d.s_size - d.s_minor - 2 > d.s_major) {
+        d.s_major = d.s_size - d.s_minor - 2;
+      }
+    } else {
+      d.s_major = 0;
+      d.s_minor = 0;
+    }
+  }
+
+  printfcn(&d);
+  output = 1;
+
+  if (f_longform) {
+    for (cur = list; cur ; cur = cur->fts_link) {
+      free(cur->fts_pointer);
+    }
+  }
+}
+
+/*
+ * Ordering for mastercmp:
+ * If ordering the argv (fts_level = FTS_ROOTLEVEL) return non-directories
+ * as larger than directories.  Within either group, use the sort function.
+ * All other levels use the sort function.  Error entries remain unsorted.
+ */
+static int
+mastercmp(const FTSENT **a, const FTSENT **b)
+{
+  int a_info, b_info;
+
+  a_info = (*a)->fts_info;
+  if (a_info == FTS_ERR) {
+    return (0);
+  }
+  b_info = (*b)->fts_info;
+  if (b_info == FTS_ERR) {
+    return (0);
+  }
+
+  if (a_info == FTS_NS || b_info == FTS_NS) {
+    if (b_info != FTS_NS) {
+      return (1);
+    } else if (a_info != FTS_NS) {
+      return (-1);
+    } else {
+      return (namecmp(*a, *b);
+    }
+  }
+
+  if (a_info != b_info && !f_listdir && (*a)->fts_level == FTS_ROOTLEVEL) {
+    if (a_info == FTS_D) {
+      return (1);
+    } else if (b_info == FTS_D) {
+      return (-1);
+    }
+  }
+  return (sortfcn(*a, *b));
+}
