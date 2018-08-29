@@ -62,4 +62,23 @@ main(int argc, char *argv[])
       Lflag = 1;
       Hflag = Pflag = 0;
       break;
-
+    case 'N':
+      Nflag = 1;
+      break;
+    case 'P':
+      Pflag = 1;
+      Hflag = Lflag = 0;
+      break;
+    case 'R':
+      Rflag = 1;
+      break;
+    case 'a':
+      Pflag = 1;
+      pflag = 1;
+      Rflag = 1;
+      Hflag = Lflag = 0;
+      break;
+    case 'f':
+      fflag = 1;
+      iflag = 0;
+      break;
