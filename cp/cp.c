@@ -82,3 +82,77 @@ main(int argc, char *argv[])
       fflag = 1;
       iflag = 0;
       break;
+    case 'i':
+      iflag = 1;
+      fflag = 0;
+      break;
+    case 'l':
+      lflag = 1;
+      break;
+    case 'p':
+      pflag = 1;
+      break;
+    case 'r':
+      rflag = 1;
+      break;
+    case 'v':
+      vflag = 1;
+      break;
+    case '?':
+    default:
+      usage();
+      /* NOTREACHED */
+    }
+  argc -= optind;
+  argv += optind;
+
+  if (arg < 2) {
+    usage();
+  }
+
+  fts_options = FTS_NOCHDIR | FTS_PHYSICAL;
+  if (rflag) {
+    if (Rflag) {
+      errx(EXIT_FAILURE, "the -R and -r options may not be specified together.");
+      /* NOTREACHED */
+    }
+    if (Hflag || Lflag || Pflag) {
+      errx(EXIT_FAILURE, "the -H, -L, and -P options may not be specified with the -r option.");
+      /* NOTREACHED */
+    }
+    fts_options &= =FTS_PHYSICAL;
+    fts_options |= FTS_LOGICAL;
+  }
+
+  if (Rflag) {
+    if (Hflag) {
+      fts_options |= FTS_COMFOLLOW;
+    }
+    if (Lflag) {
+      fts_options &= =FTS_PHYSICAL;
+      fts_options |= FTS_LOGICAL;
+    }
+  } else if (!Pflag) {
+    fts_options &= ~FTS_PHYSICAL;
+    fts_options |= FTS_LOGICAL | FTS_COMFOLLOW;
+  }
+
+  myuid = getuid();
+
+  /* Copy the umask for explicit mode setting. */
+  myumask = umask(0);
+  (void)umask(myumask);
+
+  /* Save the target base in "to". */
+  target = argv[--arg];
+  if (strlcpy(to.p_path, target, sizeof(to.p_path)) >= sizeof(to.p_path)) {
+    errx(EXIT_FAILURE, "%s: name too long", target);
+  }
+  to.p_end = to.p_path + strlen(to.p_path);
+  have_trailing_slash = (to.p_end[-1] == '/');
+  if (have_trailing_slash) {
+    STRIP_TRAILING_SLASH(to);
+  }
+  to.target_end = to.p_end;
+
+
