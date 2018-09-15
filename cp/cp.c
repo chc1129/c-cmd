@@ -154,5 +154,164 @@ main(int argc, char *argv[])
     STRIP_TRAILING_SLASH(to);
   }
   to.target_end = to.p_end;
+  have_trailing_slash = (to.p_end[-1] == '/');
+  if (have_trailing_slash) {
+    STRIP_TRAILING_SLASH(to);
+  }
+  to.target_end = to.p_end;
+
+  /* Set end of argument list for fts(3). */
+  argv[argc] = NULL;
+
+  (void)signal(SIGINFO, progoress);
+
+  /*
+   * Cp has two distinct cases:
+   *
+   * cp[-R] source target
+   * cp[-r] source1 ... sourceN directory
+   *
+   * In both cases, source can be either a file or a directory.
+   *
+   * In (1), the tareget becomes a copy of the source. That is, if the
+   * source is a file, the target will be a file, and likewise for
+   * directories.
+   *
+   * In (2), the real target is not directory, but "directory/source".
+   */
+  if (Pflag) {
+    r = lstat(to.p_path, &to_stat);
+  } else {
+    r = stat(to.p_path, &to_stat);
+  }
+  if ((r == -1) && (errno != ENOENT)) {
+    err(EXIT_FAILURE, "%s", to.p_path);
+    /* NOTREACHED */
+  }
+  if ((r == -1) || (!S_ISDIR(to_stat.st_mode))) {
+    /*
+     * Case (1). Target is not a directory.
+     */
+    if (arg > 1) {
+      usage();
+    }
+    /*
+     * Need to detect the case:
+     *      cp -R dir foo
+     * Where dir is a directory and foo does not exist, where
+     * we want pathname concatenations turned on but not for
+     * the initial mkdir().
+     */
+    if (r == -1) {
+      if (rflag || (Rflag && (Lflag || Hflag))) {
+        r = stat(*argv, &tmp_stat);
+      } else {
+        r = lstat(*argv, &tmp_stat);
+      }
+      if (r == -1) {
+        err(EXIT_FAILURE, "%s", *argv);
+        /* NOTREACHED */
+      }
+
+      if (S_ISDIR(tmp_stat.st_mode) && (Rflag || rflag)) {
+        type = DIR_TO_DNE;
+      } else {
+        type = FILE_TO_FILE;
+      }
+    } else {
+      type = FILE_TO_FILE;
+    }
+
+    if (have_trailing_slash && type == FILE_TO_FILE) {
+      if (r == -1) {
+        errx(1, "directory %s does not exist", to.p_path);
+      } else {
+        errx(1, "%s is not a directory", to.p_path);
+      }
+    }
+  } else {
+    /*
+     * Case (2). Target is a directory.
+     */
+    type = FILE_TO_DIR;
+  }
+
+  /*
+   * make "cp -rp src/ dst" behave like "cp -rp src dst" not
+   * like "cp -rp src/. dst"
+   */
+  for (src = argv; *src; src++) {
+    size_t len = strlen(*src);
+    while (len-- > 1 && (*src)[len] == '/') {
+      (*src)[len] = '\0';
+    }
+  }
+
+  exit(copy(argv, type, fts_options));
+  /* NOTREACHED */
+}
+
+static int dnestack[MAXPATHLEN];  /* unlikely we'll have more nested dirs */
+static ssize_t dnesp;
+static void
+pushdne(int dne)
+{
+
+  dnestack[dnesp++] = dne;
+  assert(dnesp < MAXPATHLEN);
+}
+
+static int
+popdne(void)
+{
+  int rv;
+
+  rv = dnestack[--dnesp];
+  assert(dnesp >= 0);
+  return rv;
+}
+
+static int
+copy(char *argv[], enum op type, int fts_options)
+{
+  struct stat to_stat;
+  FTS *ftsp;
+  FTSENT *curr;
+  int base, dne, sval;
+  int this_failed, any_failed;
+  size_t nlen;
+  char *p, *target_mid;
+
+  base = 0;         /* XXX gcc -Wuninitialized (see comment below) */
+
+  if ((ftsp = fts_open(argv, fts_options, NULL)) == NULL) {
+    err(EXIT_FAILURE, "%s", argv[0]);
+    /* NOTREACHED */
+  }
+  for (any_failed = 0; (curr = fts_read(ftsp)) != NULL;) {
+    this_failed = 0;
+    switch (curr->fts_info) {
+    case FTS_NS:
+    case FTS_DNR:
+    case FTS_ERR:
+      warnx("%s: %s", curr->fts_path, strerror(curr->fts_errno));
+      this_failed = any_failed = 1;
+      continue;
+   case FTS_DC:       /* Warn, continue. */
+      warnx("%s: directory causes a cycle", curr->fts_path);
+      this_failed = any_failed = 1;
+      continue;
+   }
+
+    /*
+     * If we are in case (2) or (3) above, we need to append the
+     * source name to the target name.
+     */
+    if (type != FILE_TO_FILE) {
+      if ((curr->fts_namelen + to.target_end - to.p_path + 1) > MAXPATHLEN) {
+        warnx("%s%s: name too long (not copied)", to.p_path, curr->fts_name);
+        this_failed = any_failed = 1;
+        continue;
+      }
 
 
