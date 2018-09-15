@@ -376,4 +376,41 @@ copy(char *argv[], enum op type, int fts_options)
     if (to_stat.st_dev == curr->fts_statp->st_dev &&
         to_stat.st_ino == curr->fts_statp->st_ino) {
       warnx("%s and %s are identical (not copied).", to.p_path, curr->fts_path);
-      
+      this_failed = any_failed = 1;
+      if (S_ISDIR(curr->fts_statp->st_mode)) {
+        (void)fts_set(ftsp, curr, FTS_SKIP);
+      }
+      continue;
+    }
+    if (!S_ISDIR(curr->fts_statp->st_mode) && S_ISDIR(to_stat.st_mode)) {
+      warnx("cannot overwrite directory %s with non-directory %s", to.p_path, curr->fts_path);
+      this_failed = any_failed = 1;
+      continue;
+    }
+    dne = 0;
+  }
+
+  switch (curr->fts_statp->st_mode & S_IFMT) {
+  case S_IFLNK:
+    /* Cathc special case of a non danling symlink */
+    if ((fts_options & FTS_LOGICAL) || ((fts_options & FTS_COMFOLLOW) && curr->fts_level == 0)) {
+      if (copy_file(curr, dne)) {
+        this_failed = any_failed = 1;
+      }
+    } else {
+      if (copy_link(curr, !dne)) {
+        this_failed = any_failed = 1;
+      }
+    }
+    break;
+  case S_IFDIR:
+    if (!Rflag && !rflag) {
+      if (curr->fts_info == FTS_D) {
+        warnx("%s is a directory (not copied).", curr->fts_path);
+      }
+      (void)fts_set(ftsp, curr, FTS_SKIP);
+      this_failed = any_failed = 1;
+      break;
+    }
+
+
