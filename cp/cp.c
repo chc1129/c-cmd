@@ -413,4 +413,38 @@ copy(char *argv[], enum op type, int fts_options)
       break;
     }
 
+    /* Directories get noticed twice;
+     *  In the first pass, create it if needed.
+     *  Int the seconde pass, after the children have been copied, set the premissions.
+     */
+    if (curr->fts_info == FTS_D)  /* First pass */
+    {
+      /*
+       * If the directory doesn't exist, create the new
+       * one with the from file mode plus owner RWX bits.
+       * modified by the umask. Trade-off between being
+       * able to write the directory (if from directory is
+       * 555) and not causing a permission race. If the
+       * umask blocks owner writes, we fail..
+       */
+      pushdne(dne);
+      if (dne) {
+        if (mkdir(to.p_path, curr->fts_statp->st_mode | S_IRWXU) < 0) {
+          err(EXIT_FAILURE, "%s", to.p_path);
+          /* NOTREACHED */
+        } else if (!S_ISDIR(to_stat.st_mode)) {
+          errno = ENOTDIR;
+          err(EXIT_FAILURE, "%s", to.p_path);
+          /* NOTREACHED */
+        }
+      }
+    }
+    else if (curr->fts_info == FTS_DP) /* Second pass */
+    {
+      /*
+       * If not -p and directory didn't exist, set it to be
+       * the same as the from directory, umodified by the
+       * umask; arguably wrong, but it's been that way
+       * forever.
+       */
 
