@@ -447,4 +447,55 @@ copy(char *argv[], enum op type, int fts_options)
        * umask; arguably wrong, but it's been that way
        * forever.
        */
+      if (pfalg && setfile(curr->fts_statp, 0)) {
+        this_failed = any_failed = 1;
+      } else if ((dne = popdne())) {
+        (void)chmod(to.p_path, curr->fts_statp->st_mode);
+      }
+    }
+    else {
+      warnx("directory %s encountered when not expected.", curr->fts_path);
+      this_failed = any_failed = 1;
+      break;
+    }
 
+    break;
+  case S_IFBLK:
+  case S_IFCHR:
+    if (Rflag) {
+      if (copy_special(curr->fts_statp, !dne)) {
+        this_failed = any_failed = 1;
+      } else {
+        if (copy_file(curr, dne)) {
+          this_failed = any_failed = 1;
+        }
+      }
+    }
+    break;
+  case S_IFIFO:
+      if (Rflag) {
+        if (copy_fifo(curr->fts_statp, !dne)) {
+          this_failed = any_failed = 1;
+        }
+      } else {
+        if (copy_file(curr, dne)) {
+          this_failed = any_failed = 1;
+        }
+      }
+      break;
+  default:
+      if (copy_file(curr, dne)) {
+        this_failed = any_failed = 1;
+      }
+      break;
+  }
+  if (vflag && !this_failed) {
+    (void)printf("%s -> %s\n", curr->fts_path, to.p_path);
+  }
+  if (errno) {
+    err(EXIT_FAILURE, "fts_read");
+    /* NOTREACHED */
+  }
+  (void)fts_close(ftsp);
+  return (any_failed);
+}
